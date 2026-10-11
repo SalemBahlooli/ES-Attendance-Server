@@ -143,6 +143,7 @@ async function compute(from, to) {
         row.note = holiday ? holiday.name : null;
       } else if (leave) {
         row.status = 'leave';
+        row.leave_type = leave.type;
         row.note = leave.type + (leave.note ? ' - ' + leave.note : '');
       } else if (now < start + shift.grace_in * MIN) {
         row.status = 'not_yet';

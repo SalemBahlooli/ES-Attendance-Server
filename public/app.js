@@ -171,6 +171,18 @@ function setMonth(month) {
 $('repMonth').onchange = () => { if ($('repMonth').value) { setMonth($('repMonth').value); loadReport(true); } };
 $('loadReport').onclick = () => loadReport(true);
 $('repDept').onchange = () => renderReport();
+// Timesheet period for the chosen month: 16th of the previous month to the 15th
+function timesheetLabel(month) {
+  const [y, m] = month.split('-').map(Number);
+  const f = (d) => d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  return `${f(new Date(Date.UTC(y, m - 2, 16)))} إلى ${f(new Date(Date.UTC(y, m - 1, 15)))}`;
+}
+$('tsExport').onclick = () => {
+  const month = $('repMonth').value || meta.today.slice(0, 7);
+  const dept = $('repDept').value;
+  toast('التايم شيت من ' + timesheetLabel(month));
+  location.href = `/timesheet.xlsx?month=${month}${dept ? '&department_id=' + dept : ''}`;
+};
 $('repExport').onclick = () => {
   const dept = $('repDept').value;
   location.href = `/export.xlsx?from=${$('repFrom').value}&to=${$('repTo').value}${dept ? '&department_id=' + dept : ''}`;

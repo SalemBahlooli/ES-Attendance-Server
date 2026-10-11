@@ -3,6 +3,7 @@ const path = require('path');
 const { pool, init } = require('./db');
 const { compute, today, LEAVE_TYPES } = require('./attendance');
 const { buildWorkbook } = require('./export');
+const { buildTimesheet } = require('./timesheet');
 const auth = require('./auth');
 const { requireAuth, need, audit } = auth;
 
@@ -583,6 +584,17 @@ app.get('/export.xlsx', requireAuth, need('report.export'), h(async (req, res) =
   const wb = await buildWorkbook(from, to, intOrNull(req.query.department_id));
   res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.set('Content-Disposition', `attachment; filename="attendance_${from}_${to}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
+}));
+
+app.get('/timesheet.xlsx', requireAuth, need('report.export'), h(async (req, res) => {
+  const month = String(req.query.month || '');
+  if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).send('bad month');
+  const { wb, period } = await buildTimesheet(month, intOrNull(req.query.department_id));
+  await audit(req, 'تصدير التايم شيت', `${period.from} إلى ${period.to}`);
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.set('Content-Disposition', `attachment; filename="Timesheet_${month}.xlsx"`);
   await wb.xlsx.write(res);
   res.end();
 }));
