@@ -27,6 +27,7 @@
   <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
   <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></symbol>
+  <symbol id="i-checkin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="m9 11 2 2 4-4"/><path d="M12 18h.01"/></symbol>
   <symbol id="i-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></symbol>
 </svg>
 
@@ -35,6 +36,7 @@
   <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-brand"/></svg></span>Attendance</div>
   <nav class="side-nav">
     <div class="nav-label">Attendance</div>
+    <button class="nav-item" data-tab="checkin"><svg class="icon"><use href="#i-checkin"/></svg>Mobile check-in</button>
     <button class="nav-item active" data-tab="today"><svg class="icon"><use href="#i-today"/></svg>Daily attendance</button>
     <button class="nav-item" data-tab="report"><svg class="icon"><use href="#i-report"/></svg>Report</button>
     <button class="nav-item" data-tab="leaves"><svg class="icon"><use href="#i-leaves"/></svg>Leaves &amp; holidays</button>
@@ -218,6 +220,18 @@
   <section id="tab-devices" hidden>
     <div class="device-grid" id="deviceList"></div>
   </section>
+  <!-- Mobile check-in (built-in admin only) -->
+  <section id="tab-checkin" hidden>
+    <div class="card pad checkin">
+      <label class="checkin-emp">Employee <select id="ciPin"></select></label>
+      <div class="checkin-clock num" id="ciClock">--:--</div>
+      <div class="muted" id="ciDate"></div>
+      <button class="checkin-btn" id="ciBtn" disabled>Check in</button>
+      <div class="muted small" id="ciHint">Select an employee to start.</div>
+      <div class="checkin-list" id="ciList"></div>
+    </div>
+  </section>
+
   <!-- Users & permissions -->
   <section id="tab-users" hidden>
     <div class="section-head">
@@ -252,6 +266,7 @@
 </div>
 
 <nav class="bottom-nav">
+  <button data-tab="checkin"><svg class="icon"><use href="#i-checkin"/></svg><span>Check-in</span></button>
   <button data-tab="today" class="active"><svg class="icon"><use href="#i-today"/></svg><span>Today</span></button>
   <button data-tab="report"><svg class="icon"><use href="#i-report"/></svg><span>Report</span></button>
   <button data-tab="leaves"><svg class="icon"><use href="#i-leaves"/></svg><span>Leaves</span></button>

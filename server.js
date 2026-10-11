@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { pool, init } = require('./db');
-const { compute, today, LEAVE_TYPES } = require('./attendance');
+const { compute, today, nowTs, LEAVE_TYPES } = require('./attendance');
 const { buildWorkbook } = require('./export');
 const { buildTimesheet } = require('./timesheet');
 const auth = require('./auth');
@@ -453,6 +453,40 @@ api.post('/devices/:sn/:action', need('devices.manage'), h(async (req, res) => {
   const NAMES = { 'sync-users': 'pull employee names', 'resend-logs': 're-pull all punches', check: 'check' };
   await audit(req, 'Device command', `${req.params.sn}: ${NAMES[req.params.action]}`);
   res.json({ ok: true });
+}));
+
+/* Mobile check-in: only the built-in admin account sees it for now (no location check yet) */
+const MOBILE_SN = 'MOBILE';
+const MOBILE_VERIFY = 100;
+const ownerOnly = (req, res, next) =>
+  req.user.builtin ? next() : res.status(403).json({ error: 'You do not have permission to do this' });
+
+async function todaysMobilePunches(pin) {
+  const { rows } = await pool.query(
+    `SELECT punch_time, status FROM attendance
+     WHERE pin = $1 AND punch_time >= $2::date AND punch_time < $2::date + 1 ORDER BY punch_time`,
+    [pin, today()]);
+  return rows;
+}
+
+api.get('/mobile/status', ownerOnly, h(async (req, res) => {
+  const pin = text(req.query.pin);
+  res.json({ now: nowTs(), punches: pin ? await todaysMobilePunches(pin) : [] });
+}));
+
+api.post('/mobile/punch', ownerOnly, h(async (req, res) => {
+  const pin = text(req.body.pin);
+  const { rows: emp } = await pool.query('SELECT name FROM employees WHERE pin = $1 AND active', [pin]);
+  if (!emp.length) return res.status(400).json({ error: 'Select an active employee' });
+  // First punch of the day is a check-in, every later one a check-out
+  const status = (await todaysMobilePunches(pin)).length ? 1 : 0;
+  const time = nowTs();
+  await pool.query(
+    `INSERT INTO attendance (sn, pin, punch_time, status, verify, raw)
+     VALUES ($1, $2, $3, $4, $5, 'mobile') ON CONFLICT DO NOTHING`,
+    [MOBILE_SN, pin, time, status, MOBILE_VERIFY]);
+  await audit(req, status ? 'Mobile check-out' : 'Mobile check-in', `${await employeeLabel(pin)} at ${time.slice(11, 16)}`);
+  res.json({ ok: true, time, status, punches: await todaysMobilePunches(pin) });
 }));
 
 /* Users, roles and audit log */

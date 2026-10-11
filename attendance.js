@@ -170,4 +170,9 @@ async function compute(from, to) {
   return { days, summary };
 }
 
-module.exports = { compute, today, STATUS, LEAVE_TYPES };
+// Current device-local time as "YYYY-MM-DD HH:MM:SS"
+function nowTs() {
+  return fmtTs(localNow());
+}
+
+module.exports = { compute, today, nowTs, STATUS, LEAVE_TYPES };
