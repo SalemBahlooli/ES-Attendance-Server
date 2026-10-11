@@ -1,6 +1,5 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const VERIFY = { 0: 'Password', 1: 'Fingerprint', 2: 'Card', 3: 'Password', 4: 'Card', 15: 'Face', 25: 'Palm' };
 const STATUS = {
   present: ['Present', 'ok'],
   late: ['Late', 'late'],
@@ -330,10 +329,8 @@ async function loadLog() {
     <td class="num">${esc(r.pin)}</td>
     <td>${nameCell(r.name)}</td>
     <td class="num">${r.punch_time.slice(0, 10)}</td>
-    <td class="num">${r.punch_time.slice(11, 19)}</td>
-    <td>${VERIFY[r.verify] || (r.verify ?? '—')}</td>
-    <td>${esc(r.device_name || r.sn) || '—'}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No punches in this period</td></tr>';
+    <td class="num">${r.punch_time.slice(11, 19)}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">No punches in this period</td></tr>';
 }
 $('loadLog').onclick = loadLog;
 

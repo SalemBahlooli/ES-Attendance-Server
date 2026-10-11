@@ -377,13 +377,9 @@ api.get('/punches', need('punches.view'), h(async (req, res) => {
   let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
   if (pin) { params.push(pin); where += ` AND a.pin = $${params.length}`; }
   const { rows } = await pool.query(
-    // Mobile punches are stored with sn 'MOBILE'; their source is never shown
-    `SELECT a.id, a.pin, e.name, a.punch_time,
-            CASE WHEN a.sn = 'MOBILE' THEN NULL ELSE a.verify END AS verify, a.status,
-            CASE WHEN a.sn = 'MOBILE' THEN NULL ELSE a.sn END AS sn, d.name AS device_name
+    `SELECT a.id, a.pin, e.name, a.punch_time
      FROM attendance a
      LEFT JOIN employees e ON e.pin = a.pin
-     LEFT JOIN devices d ON d.sn = a.sn
      WHERE ${where} ORDER BY a.punch_time DESC LIMIT 5000`,
     params
   );
