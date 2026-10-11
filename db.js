@@ -133,10 +133,19 @@ async function init() {
     CREATE INDEX IF NOT EXISTS audit_log_time_idx ON audit_log (created_at DESC);
   `);
 
+  // The dashboard used to be Arabic: convert stored leave types and the default shift name to English
+  await pool.query(`
+    UPDATE leaves SET type = CASE type
+      WHEN 'سنوية' THEN 'Annual' WHEN 'مرضية' THEN 'Sick' WHEN 'اضطرارية' THEN 'Emergency'
+      WHEN 'بدون راتب' THEN 'Unpaid' WHEN 'مهمة عمل' THEN 'Business trip' WHEN 'أخرى' THEN 'Other' END
+    WHERE type IN ('سنوية', 'مرضية', 'اضطرارية', 'بدون راتب', 'مهمة عمل', 'أخرى');
+    UPDATE shifts SET name = 'Standard shift' WHERE name = 'الدوام الرسمي';
+  `);
+
   // First run: create the default shift from WORK_START / WORK_END.
   await pool.query(
     `INSERT INTO shifts (name, start_time, end_time, is_default)
-     SELECT 'الدوام الرسمي', $1, $2, true WHERE NOT EXISTS (SELECT 1 FROM shifts)`,
+     SELECT 'Standard shift', $1, $2, true WHERE NOT EXISTS (SELECT 1 FROM shifts)`,
     [process.env.WORK_START || '08:00', process.env.WORK_END || '16:00']
   );
 }

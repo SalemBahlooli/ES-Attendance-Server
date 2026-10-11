@@ -1,8 +1,8 @@
 {
-  "name": "نظام الحضور",
-  "short_name": "الحضور",
-  "lang": "ar",
-  "dir": "rtl",
+  "name": "Attendance System",
+  "short_name": "Attendance",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6f5f1",

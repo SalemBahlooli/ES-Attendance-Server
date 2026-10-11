@@ -6,19 +6,19 @@ const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toSt
 const SESSION_MAX_AGE = 30 * 24 * 3600; // seconds
 
 const PERMISSIONS = [
-  { key: 'attendance.view', group: 'الحضور', label: 'عرض الحضور اليومي' },
-  { key: 'report.view', group: 'الحضور', label: 'عرض التقارير' },
-  { key: 'report.export', group: 'الحضور', label: 'تصدير Excel' },
-  { key: 'punches.view', group: 'الحضور', label: 'عرض سجل البصمات' },
-  { key: 'leaves.view', group: 'الإجازات', label: 'عرض الإجازات والعطل' },
-  { key: 'leaves.edit', group: 'الإجازات', label: 'إضافة وحذف إجازات الموظفين' },
-  { key: 'holidays.edit', group: 'الإجازات', label: 'إضافة وحذف العطل الرسمية' },
-  { key: 'employees.view', group: 'الموظفين', label: 'عرض الموظفين' },
-  { key: 'employees.edit', group: 'الموظفين', label: 'تعديل بيانات الموظفين' },
-  { key: 'settings.edit', group: 'الإعدادات', label: 'إدارة الورديات والأقسام' },
-  { key: 'devices.view', group: 'الإعدادات', label: 'عرض الأجهزة' },
-  { key: 'devices.manage', group: 'الإعدادات', label: 'إرسال أوامر للأجهزة وتسميتها' },
-  { key: 'users.manage', group: 'الإعدادات', label: 'إدارة المستخدمين والصلاحيات وسجل العمليات' },
+  { key: 'attendance.view', group: 'Attendance', label: 'View daily attendance' },
+  { key: 'report.view', group: 'Attendance', label: 'View reports' },
+  { key: 'report.export', group: 'Attendance', label: 'Export Excel and timesheet' },
+  { key: 'punches.view', group: 'Attendance', label: 'View punch log' },
+  { key: 'leaves.view', group: 'Leaves', label: 'View leaves and holidays' },
+  { key: 'leaves.edit', group: 'Leaves', label: 'Add and delete employee leaves' },
+  { key: 'holidays.edit', group: 'Leaves', label: 'Add and delete public holidays' },
+  { key: 'employees.view', group: 'Employees', label: 'View employees' },
+  { key: 'employees.edit', group: 'Employees', label: 'Edit employee details' },
+  { key: 'settings.edit', group: 'Settings', label: 'Manage shifts and departments' },
+  { key: 'devices.view', group: 'Settings', label: 'View devices' },
+  { key: 'devices.manage', group: 'Settings', label: 'Send device commands and rename devices' },
+  { key: 'users.manage', group: 'Settings', label: 'Manage users, permissions and the audit log' },
 ];
 const ALL = PERMISSIONS.map((p) => p.key);
 
@@ -26,7 +26,7 @@ const ALL = PERMISSIONS.map((p) => p.key);
 // so there is no way to lock yourself out. Its sessions end when ADMIN_PASSWORD changes.
 const OWNER_USERNAME = 'admin';
 const ownerVersion = () => crypto.createHash('sha256').update(ADMIN_PASSWORD).digest('hex').slice(0, 8);
-const OWNER = { id: 0, username: OWNER_USERNAME, name: 'مالك النظام', role: 'مالك النظام', builtin: true, permissions: ALL };
+const OWNER = { id: 0, username: OWNER_USERNAME, name: 'System owner', role: 'Owner', builtin: true, permissions: ALL };
 
 /* Passwords */
 function hashPassword(password) {
@@ -106,7 +106,7 @@ async function requireAuth(req, res, next) {
 const need = (...perms) => (req, res, next) =>
   perms.some((p) => req.user.permissions.includes(p))
     ? next()
-    : res.status(403).json({ error: 'ما عندك صلاحية لهذي العملية' });
+    : res.status(403).json({ error: 'You do not have permission to do this' });
 
 /* Audit log */
 async function audit(req, action, details) {
@@ -161,7 +161,7 @@ async function login(req, res) {
 
   failures.delete(ip);
   req.user = user;
-  await audit(req, 'تسجيل دخول');
+  await audit(req, 'Sign in');
   res.set('Set-Cookie',
     `sid=${encodeURIComponent(makeToken(user.id, version))}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}` +
     (req.secure ? '; Secure' : ''));
@@ -170,14 +170,18 @@ async function login(req, res) {
 
 /* Seed default roles on first run */
 async function initAuth() {
+  // Rename the default roles created while the dashboard was Arabic
+  await pool.query(`
+    UPDATE roles SET name = CASE name WHEN 'مدير النظام' THEN 'System admin' WHEN 'مشرف' THEN 'Supervisor' ELSE 'Viewer' END
+    WHERE name IN ('مدير النظام', 'مشرف', 'مشاهد')`);
   const { rows } = await pool.query('SELECT COUNT(*)::int AS n FROM roles');
   if (rows[0].n) return;
   const viewAll = ['attendance.view', 'report.view', 'punches.view', 'leaves.view', 'employees.view', 'devices.view'];
   await pool.query(
     `INSERT INTO roles (name, permissions, is_system) VALUES
-       ('مدير النظام', $1, true),
-       ('مشرف', $2, false),
-       ('مشاهد', $3, false)`,
+       ('System admin', $1, true),
+       ('Supervisor', $2, false),
+       ('Viewer', $3, false)`,
     [ALL, [...viewAll, 'report.export', 'leaves.edit', 'employees.edit'], viewAll]
   );
 }

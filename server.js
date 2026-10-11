@@ -226,7 +226,7 @@ const text = (v) => String(v ?? '').trim() || null;
 
 async function employeeLabel(pin) {
   const { rows } = await pool.query('SELECT name FROM employees WHERE pin = $1', [pin]);
-  return rows[0] && rows[0].name ? `${rows[0].name} (${pin})` : `الموظف ${pin}`;
+  return rows[0] && rows[0].name ? `${rows[0].name} (${pin})` : `Employee ${pin}`;
 }
 
 function rangeOk(from, to, maxDays = 366) {
@@ -268,55 +268,55 @@ function shiftBody(b) {
 
 api.post('/shifts', need('settings.edit'), h(async (req, res) => {
   const v = shiftBody(req.body);
-  if (!v) return res.status(400).json({ error: 'بيانات الوردية ناقصة' });
+  if (!v) return res.status(400).json({ error: 'Shift details are incomplete' });
   const { rows } = await pool.query(
     `INSERT INTO shifts (name, start_time, end_time, grace_in, grace_out, weekend)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, v);
-  await audit(req, 'إضافة وردية', `${v[0]} (${v[1]} - ${v[2]})`);
+  await audit(req, 'Add shift', `${v[0]} (${v[1]} - ${v[2]})`);
   res.json(rows[0]);
 }));
 
 api.put('/shifts/:id', need('settings.edit'), h(async (req, res) => {
   const v = shiftBody(req.body);
-  if (!v) return res.status(400).json({ error: 'بيانات الوردية ناقصة' });
+  if (!v) return res.status(400).json({ error: 'Shift details are incomplete' });
   await pool.query(
     `UPDATE shifts SET name = $2, start_time = $3, end_time = $4, grace_in = $5, grace_out = $6, weekend = $7
      WHERE id = $1`, [req.params.id, ...v]);
   if (req.body.is_default) {
     await pool.query('UPDATE shifts SET is_default = (id = $1)', [req.params.id]);
   }
-  await audit(req, req.body.is_default ? 'تعيين الوردية الافتراضية' : 'تعديل وردية', `${v[0]} (${v[1]} - ${v[2]}، مهلة ${v[3]} د)`);
+  await audit(req, req.body.is_default ? 'Set default shift' : 'Edit shift', `${v[0]} (${v[1]} - ${v[2]}, grace ${v[3]} min)`);
   res.json({ ok: true });
 }));
 
 api.delete('/shifts/:id', need('settings.edit'), h(async (req, res) => {
   const { rows } = await pool.query('DELETE FROM shifts WHERE id = $1 AND NOT is_default RETURNING name', [req.params.id]);
-  if (!rows.length) return res.status(400).json({ error: 'لا يمكن حذف الوردية الافتراضية' });
-  await audit(req, 'حذف وردية', rows[0].name);
+  if (!rows.length) return res.status(400).json({ error: 'The default shift cannot be deleted' });
+  await audit(req, 'Delete shift', rows[0].name);
   res.json({ ok: true });
 }));
 
 /* Departments */
 api.post('/departments', need('settings.edit'), h(async (req, res) => {
-  if (!text(req.body.name)) return res.status(400).json({ error: 'اكتب اسم القسم' });
+  if (!text(req.body.name)) return res.status(400).json({ error: 'Enter a department name' });
   const { rows } = await pool.query(
     'INSERT INTO departments (name, shift_id) VALUES ($1, $2) RETURNING *',
     [text(req.body.name), intOrNull(req.body.shift_id)]);
-  await audit(req, 'إضافة قسم', rows[0].name);
+  await audit(req, 'Add department', rows[0].name);
   res.json(rows[0]);
 }));
 
 api.put('/departments/:id', need('settings.edit'), h(async (req, res) => {
-  if (!text(req.body.name)) return res.status(400).json({ error: 'اكتب اسم القسم' });
+  if (!text(req.body.name)) return res.status(400).json({ error: 'Enter a department name' });
   await pool.query('UPDATE departments SET name = $2, shift_id = $3 WHERE id = $1',
     [req.params.id, text(req.body.name), intOrNull(req.body.shift_id)]);
-  await audit(req, 'تعديل قسم', text(req.body.name));
+  await audit(req, 'Edit department', text(req.body.name));
   res.json({ ok: true });
 }));
 
 api.delete('/departments/:id', need('settings.edit'), h(async (req, res) => {
   const { rows } = await pool.query('DELETE FROM departments WHERE id = $1 RETURNING name', [req.params.id]);
-  if (rows.length) await audit(req, 'حذف قسم', rows[0].name);
+  if (rows.length) await audit(req, 'Delete department', rows[0].name);
   res.json({ ok: true });
 }));
 
@@ -328,16 +328,16 @@ api.get('/holidays', need('leaves.view'), h(async (req, res) => {
 
 api.post('/holidays', need('holidays.edit'), h(async (req, res) => {
   const { name, start_date, end_date } = req.body;
-  if (!text(name) || !rangeOk(start_date, end_date)) return res.status(400).json({ error: 'تحقق من الاسم والتواريخ' });
+  if (!text(name) || !rangeOk(start_date, end_date)) return res.status(400).json({ error: 'Check the name and dates' });
   await pool.query('INSERT INTO holidays (name, start_date, end_date) VALUES ($1, $2, $3)',
     [text(name), start_date, end_date]);
-  await audit(req, 'إضافة عطلة رسمية', `${text(name)} (${start_date} إلى ${end_date})`);
+  await audit(req, 'Add public holiday', `${text(name)} (${start_date} to ${end_date})`);
   res.json({ ok: true });
 }));
 
 api.delete('/holidays/:id', need('holidays.edit'), h(async (req, res) => {
   const { rows } = await pool.query('DELETE FROM holidays WHERE id = $1 RETURNING *', [req.params.id]);
-  if (rows.length) await audit(req, 'حذف عطلة رسمية', `${rows[0].name} (${rows[0].start_date} إلى ${rows[0].end_date})`);
+  if (rows.length) await audit(req, 'Delete public holiday', `${rows[0].name} (${rows[0].start_date} to ${rows[0].end_date})`);
   res.json({ ok: true });
 }));
 
@@ -352,12 +352,12 @@ api.get('/leaves', need('leaves.view'), h(async (req, res) => {
 api.post('/leaves', need('leaves.edit'), h(async (req, res) => {
   const { pin, type, start_date, end_date, note } = req.body;
   if (!text(pin) || !LEAVE_TYPES.includes(type) || !rangeOk(start_date, end_date)) {
-    return res.status(400).json({ error: 'تحقق من الموظف والنوع والتواريخ' });
+    return res.status(400).json({ error: 'Check the employee, type and dates' });
   }
   await pool.query(
     'INSERT INTO leaves (pin, type, start_date, end_date, note) VALUES ($1, $2, $3, $4, $5)',
     [text(pin), type, start_date, end_date, text(note)]);
-  await audit(req, 'إضافة إجازة', `${await employeeLabel(pin)}: ${type} (${start_date} إلى ${end_date})`);
+  await audit(req, 'Add leave', `${await employeeLabel(pin)}: ${type} (${start_date} to ${end_date})`);
   res.json({ ok: true });
 }));
 
@@ -365,7 +365,7 @@ api.delete('/leaves/:id', need('leaves.edit'), h(async (req, res) => {
   const { rows } = await pool.query('DELETE FROM leaves WHERE id = $1 RETURNING *', [req.params.id]);
   if (rows.length) {
     const l = rows[0];
-    await audit(req, 'حذف إجازة', `${await employeeLabel(l.pin)}: ${l.type} (${l.start_date} إلى ${l.end_date})`);
+    await audit(req, 'Delete leave', `${await employeeLabel(l.pin)}: ${l.type} (${l.start_date} to ${l.end_date})`);
   }
   res.json({ ok: true });
 }));
@@ -417,9 +417,9 @@ api.put('/employees/:pin', need('employees.edit'), h(async (req, res) => {
      ON CONFLICT (pin) DO UPDATE SET ${keys.map((k) => `${k} = EXCLUDED.${k}`).join(', ')}`,
     [req.params.pin, ...values]
   );
-  const LABELS = { name: 'الاسم', department_id: 'القسم', shift_id: 'الوردية', active: 'نشط', start_date: 'تاريخ المباشرة' };
-  await audit(req, 'تعديل موظف',
-    `${await employeeLabel(req.params.pin)}: ` + keys.map((k, i) => `${LABELS[k]} = ${values[i] ?? 'فارغ'}`).join('، '));
+  const LABELS = { name: 'name', department_id: 'department', shift_id: 'shift', active: 'active', start_date: 'start date' };
+  await audit(req, 'Edit employee',
+    `${await employeeLabel(req.params.pin)}: ` + keys.map((k, i) => `${LABELS[k]} = ${values[i] ?? 'empty'}`).join(', '));
   res.json({ ok: true });
 }));
 
@@ -435,7 +435,7 @@ api.get('/devices', need('devices.view'), h(async (req, res) => {
 api.put('/devices/:sn', need('devices.manage'), h(async (req, res) => {
   const name = String(req.body.name || '').trim() || null;
   await pool.query(`UPDATE devices SET name = $2 WHERE sn = $1`, [req.params.sn, name]);
-  await audit(req, 'تسمية جهاز', `${req.params.sn}: ${name || 'بدون اسم'}`);
+  await audit(req, 'Rename device', `${req.params.sn}: ${name || 'no name'}`);
   res.json({ ok: true });
 }));
 
@@ -450,8 +450,8 @@ api.post('/devices/:sn/:action', need('devices.manage'), h(async (req, res) => {
   const command = COMMANDS[req.params.action];
   if (!command) return res.status(400).json({ error: 'unknown action' });
   await pool.query(`INSERT INTO commands (sn, command) VALUES ($1, $2)`, [req.params.sn, command]);
-  const NAMES = { 'sync-users': 'سحب أسماء الموظفين', 'resend-logs': 'إعادة سحب كل البصمات', check: 'فحص' };
-  await audit(req, 'أمر للجهاز', `${req.params.sn}: ${NAMES[req.params.action]}`);
+  const NAMES = { 'sync-users': 'pull employee names', 'resend-logs': 're-pull all punches', check: 'check' };
+  await audit(req, 'Device command', `${req.params.sn}: ${NAMES[req.params.action]}`);
   res.json({ ok: true });
 }));
 
@@ -464,17 +464,17 @@ async function roleExists(id) {
 }
 
 api.post('/me/password', h(async (req, res) => {
-  if (req.user.builtin) return res.status(400).json({ error: 'كلمة مرور admin تتغير من متغير ADMIN_PASSWORD في Railway' });
+  if (req.user.builtin) return res.status(400).json({ error: 'The admin password is set by the ADMIN_PASSWORD variable in Railway' });
   const { current, password } = req.body;
   const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
   if (!rows.length || !auth.checkPassword(current, rows[0].password_hash)) {
-    return res.status(400).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+    return res.status(400).json({ error: 'Current password is incorrect' });
   }
-  if (String(password || '').length < 6) return res.status(400).json({ error: 'كلمة المرور لازم تكون 6 أحرف على الأقل' });
+  if (String(password || '').length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   // Bumping token_version ends other sessions; give this one a fresh cookie
   await pool.query('UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1',
     [req.user.id, auth.hashPassword(password)]);
-  await audit(req, 'تغيير كلمة المرور الخاصة');
+  await audit(req, 'Change own password');
   res.json({ ok: true, relogin: true });
 }));
 
@@ -488,43 +488,43 @@ api.get('/users', need('users.manage'), h(async (req, res) => {
 api.post('/users', need('users.manage'), h(async (req, res) => {
   const { username, name, password, role_id } = req.body;
   if (!USERNAME_RE.test(username || '')) {
-    return res.status(400).json({ error: 'اسم المستخدم من 3 إلى 32 حرف إنجليزي أو رقم بدون مسافات' });
+    return res.status(400).json({ error: 'Username must be 3-32 letters, digits, dots, dashes or underscores, without spaces' });
   }
-  if (username.toLowerCase() === auth.OWNER_USERNAME) return res.status(400).json({ error: 'اسم المستخدم admin محجوز' });
-  if (String(password || '').length < 6) return res.status(400).json({ error: 'كلمة المرور لازم تكون 6 أحرف على الأقل' });
-  if (!(await roleExists(role_id))) return res.status(400).json({ error: 'اختر الدور' });
+  if (username.toLowerCase() === auth.OWNER_USERNAME) return res.status(400).json({ error: 'The username admin is reserved' });
+  if (String(password || '').length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (!(await roleExists(role_id))) return res.status(400).json({ error: 'Select a role' });
   const { rows: dup } = await pool.query('SELECT 1 FROM users WHERE lower(username) = lower($1)', [username]);
-  if (dup.length) return res.status(400).json({ error: 'اسم المستخدم مستخدم من قبل' });
+  if (dup.length) return res.status(400).json({ error: 'That username is already taken' });
   await pool.query('INSERT INTO users (username, name, password_hash, role_id) VALUES ($1, $2, $3, $4)',
     [username, text(name), auth.hashPassword(password), role_id]);
-  await audit(req, 'إضافة مستخدم', `${text(name) || username} (${username})`);
+  await audit(req, 'Add user', `${text(name) || username} (${username})`);
   res.json({ ok: true });
 }));
 
 api.put('/users/:id', need('users.manage'), h(async (req, res) => {
   const { name, role_id, active, password } = req.body;
-  if (!(await roleExists(role_id))) return res.status(400).json({ error: 'اختر الدور' });
+  if (!(await roleExists(role_id))) return res.status(400).json({ error: 'Select a role' });
   if (Number(req.params.id) === req.user.id && active === false) {
-    return res.status(400).json({ error: 'ما تقدر توقف حسابك أنت' });
+    return res.status(400).json({ error: 'You cannot deactivate your own account' });
   }
-  if (password && String(password).length < 6) return res.status(400).json({ error: 'كلمة المرور لازم تكون 6 أحرف على الأقل' });
+  if (password && String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   const { rows } = await pool.query(
     `UPDATE users SET name = $2, role_id = $3, active = $4 WHERE id = $1 RETURNING username`,
     [req.params.id, text(name), role_id, active !== false]);
-  if (!rows.length) return res.status(404).json({ error: 'المستخدم غير موجود' });
+  if (!rows.length) return res.status(404).json({ error: 'User not found' });
   if (password) {
     await pool.query('UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1',
       [req.params.id, auth.hashPassword(password)]);
   }
-  await audit(req, 'تعديل مستخدم',
-    `${rows[0].username}${active === false ? ' (موقوف)' : ''}${password ? '، تغيير كلمة المرور' : ''}`);
+  await audit(req, 'Edit user',
+    `${rows[0].username}${active === false ? ' (inactive)' : ''}${password ? ', password changed' : ''}`);
   res.json({ ok: true });
 }));
 
 api.delete('/users/:id', need('users.manage'), h(async (req, res) => {
-  if (Number(req.params.id) === req.user.id) return res.status(400).json({ error: 'ما تقدر تحذف حسابك أنت' });
+  if (Number(req.params.id) === req.user.id) return res.status(400).json({ error: 'You cannot delete your own account' });
   const { rows } = await pool.query('DELETE FROM users WHERE id = $1 RETURNING username', [req.params.id]);
-  if (rows.length) await audit(req, 'حذف مستخدم', rows[0].username);
+  if (rows.length) await audit(req, 'Delete user', rows[0].username);
   res.json({ ok: true });
 }));
 
@@ -542,20 +542,20 @@ function roleBody(b) {
 
 api.post('/roles', need('users.manage'), h(async (req, res) => {
   const v = roleBody(req.body);
-  if (!v) return res.status(400).json({ error: 'اكتب اسم الدور' });
+  if (!v) return res.status(400).json({ error: 'Enter a role name' });
   await pool.query('INSERT INTO roles (name, permissions) VALUES ($1, $2)', v);
-  await audit(req, 'إضافة دور', `${v[0]} (${v[1].length} صلاحية)`);
+  await audit(req, 'Add role', `${v[0]} (${v[1].length} permissions)`);
   res.json({ ok: true });
 }));
 
 api.put('/roles/:id', need('users.manage'), h(async (req, res) => {
   const v = roleBody(req.body);
-  if (!v) return res.status(400).json({ error: 'اكتب اسم الدور' });
+  if (!v) return res.status(400).json({ error: 'Enter a role name' });
   // The system role always keeps every permission; only its name can change
   await pool.query(
     'UPDATE roles SET name = $2, permissions = CASE WHEN is_system THEN permissions ELSE $3 END WHERE id = $1',
     [req.params.id, ...v]);
-  await audit(req, 'تعديل دور', `${v[0]} (${v[1].length} صلاحية)`);
+  await audit(req, 'Edit role', `${v[0]} (${v[1].length} permissions)`);
   res.json({ ok: true });
 }));
 
@@ -564,10 +564,10 @@ api.delete('/roles/:id', need('users.manage'), h(async (req, res) => {
     `SELECT name, is_system, (SELECT COUNT(*)::int FROM users WHERE role_id = $1) AS users FROM roles WHERE id = $1`,
     [req.params.id]);
   if (!rows.length) return res.json({ ok: true });
-  if (rows[0].is_system) return res.status(400).json({ error: 'ما يمكن حذف دور مدير النظام' });
-  if (rows[0].users) return res.status(400).json({ error: 'فيه مستخدمين على هذا الدور، غيّر دورهم أول' });
+  if (rows[0].is_system) return res.status(400).json({ error: 'The system admin role cannot be deleted' });
+  if (rows[0].users) return res.status(400).json({ error: 'This role still has users. Change their role first' });
   await pool.query('DELETE FROM roles WHERE id = $1', [req.params.id]);
-  await audit(req, 'حذف دور', rows[0].name);
+  await audit(req, 'Delete role', rows[0].name);
   res.json({ ok: true });
 }));
 
@@ -592,7 +592,7 @@ app.get('/timesheet.xlsx', requireAuth, need('report.export'), h(async (req, res
   const month = String(req.query.month || '');
   if (!/^\d{4}-\d{2}$/.test(month)) return res.status(400).send('bad month');
   const { wb, period } = await buildTimesheet(month, intOrNull(req.query.department_id));
-  await audit(req, 'تصدير التايم شيت', `${period.from} إلى ${period.to}`);
+  await audit(req, 'Export timesheet', `${period.from} to ${period.to}`);
   res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.set('Content-Disposition', `attachment; filename="Timesheet_${month}.xlsx"`);
   await wb.xlsx.write(res);

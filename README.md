@@ -1,6 +1,6 @@
 # ES Attendance Server
 
-سيرفر حضور وانصراف يستقبل البصمات مباشرة من جهاز **ZKTeco uFace 800** عبر خاصية Cloud Server (ADMS)، ويحفظها في PostgreSQL، ويعرضها في لوحة ويب بالعربي.
+سيرفر حضور وانصراف يستقبل البصمات مباشرة من جهاز **ZKTeco uFace 800** عبر خاصية Cloud Server (ADMS)، ويحفظها في PostgreSQL، ويعرضها في لوحة ويب بالإنجليزي.
 
 ## التشغيل على Railway
 

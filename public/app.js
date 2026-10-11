@@ -1,17 +1,17 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const VERIFY = { 0: 'كلمة مرور', 1: 'بصمة إصبع', 2: 'بطاقة', 3: 'كلمة مرور', 4: 'بطاقة', 15: 'الوجه', 25: 'راحة اليد' };
+const VERIFY = { 0: 'Password', 1: 'Fingerprint', 2: 'Card', 3: 'Password', 4: 'Card', 15: 'Face', 25: 'Palm' };
 const STATUS = {
-  present: ['حاضر', 'ok'],
-  late: ['متأخر', 'late'],
-  absent: ['غائب', 'absent'],
-  leave: ['إجازة', 'info'],
-  holiday: ['عطلة رسمية', 'off'],
-  weekend: ['عطلة أسبوعية', 'off'],
-  offday_work: ['دوام في يوم عطلة', 'info'],
-  not_yet: ['لم يبصم بعد', 'off'],
+  present: ['Present', 'ok'],
+  late: ['Late', 'late'],
+  absent: ['Absent', 'absent'],
+  leave: ['On leave', 'info'],
+  holiday: ['Public holiday', 'off'],
+  weekend: ['Weekend', 'off'],
+  offday_work: ['Worked day off', 'info'],
+  not_yet: ['Not in yet', 'off'],
 };
-const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 let meta = { today: '', leaveTypes: [], shifts: [], departments: [], me: { permissions: [] }, permissionList: [] };
 const can = (perm) => meta.me.permissions.includes(perm);
@@ -34,7 +34,7 @@ async function api(url, opts = {}) {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
   if (res.status === 401) { location.href = '/login'; throw new Error('unauthorized'); }
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) { toast(body.error || 'صار خطأ، حاول مرة ثانية'); throw new Error(body.error); }
+  if (!res.ok) { toast(body.error || 'Something went wrong, please try again'); throw new Error(body.error); }
   return body;
 }
 const send = (url, method, data) => api(url, { method, body: data ? JSON.stringify(data) : undefined });
@@ -45,11 +45,13 @@ function addDays(date, n) {
   return d.toISOString().slice(0, 10);
 }
 const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1;
+// "YYYY-MM-DD HH:MM" in the browser's local time
+const dateTime = (ts) => (ts ? new Date(ts).toLocaleString('sv-SE').slice(0, 16) : '—');
 const hm = (ts) => (ts ? ts.slice(11, 16) : '—');
 const hhmm = (mins) => (mins ? `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}` : '—');
-const mins = (m) => (m ? `${m} د` : '—');
+const mins = (m) => (m ? `${m} min` : '—');
 const pill = (status) => `<span class="pill ${STATUS[status][1]}">${STATUS[status][0]}</span>`;
-const nameCell = (name) => esc(name) || '<span class="muted">بدون اسم</span>';
+const nameCell = (name) => esc(name) || '<span class="muted">No name</span>';
 const formData = (form) => Object.fromEntries(new FormData(form).entries());
 
 function options(list, selected, emptyLabel) {
@@ -66,7 +68,7 @@ async function loadMeta() {
   meta = await api('/api/meta');
   document.querySelectorAll('.dept-filter').forEach((sel) => {
     const v = sel.value;
-    sel.innerHTML = options(meta.departments, v, 'كل الأقسام');
+    sel.innerHTML = options(meta.departments, v, 'All departments');
   });
 }
 
@@ -75,7 +77,7 @@ function applyPermissions() {
   document.querySelectorAll('[data-tab]').forEach((el) => (el.hidden = !canTab(el.dataset.tab)));
   document.querySelectorAll('[data-perm]').forEach((el) => (el.hidden = !can(el.dataset.perm)));
   $('meName').textContent = meta.me.name || meta.me.username;
-  $('meRole').textContent = `${meta.me.role || 'بدون دور'} · ${meta.me.username}`;
+  $('meRole').textContent = `${meta.me.role || 'No role'} · ${meta.me.username}`;
   document.querySelectorAll('[data-action=password]').forEach((el) => (el.hidden = meta.me.builtin));
   document.querySelector('.sheet-sep').hidden = !$('moreSheet').querySelector('[data-tab]:not([hidden])');
 }
@@ -84,10 +86,10 @@ async function loadEmployeeList() {
   if (!can('employees.view') && !can('leaves.edit') && !can('punches.view')) return;
   employees = await api('/api/employees');
   const active = employees.filter((e) => e.active);
-  const label = (e) => `${e.pin} - ${e.name || 'بدون اسم'}`;
-  $('pinFilter').innerHTML = '<option value="">كل الموظفين</option>' +
+  const label = (e) => `${e.pin} - ${e.name || 'No name'}`;
+  $('pinFilter').innerHTML = '<option value="">All employees</option>' +
     active.map((e) => `<option value="${esc(e.pin)}">${esc(label(e))}</option>`).join('');
-  $('leavePin').innerHTML = '<option value="">اختر الموظف</option>' +
+  $('leavePin').innerHTML = '<option value="">Select employee</option>' +
     active.map((e) => `<option value="${esc(e.pin)}">${esc(label(e))}</option>`).join('');
 }
 
@@ -97,14 +99,14 @@ const loaders = {
   log: loadLog, settings: loadSettings, devices: loadDevices, users: loadUsers,
 };
 const TITLES = {
-  today: 'الحضور اليومي', report: 'تقرير الحضور', leaves: 'الإجازات والعطل', employees: 'الموظفين',
-  log: 'سجل البصمات', settings: 'الورديات والأقسام', devices: 'الأجهزة', users: 'المستخدمين والصلاحيات',
+  today: 'Daily attendance', report: 'Attendance report', leaves: 'Leaves & holidays', employees: 'Employees',
+  log: 'Punch log', settings: 'Shifts & departments', devices: 'Devices', users: 'Users & permissions',
 };
 function showTab(name) {
   if (!loaders[name] || !canTab(name)) name = Object.keys(loaders).find(canTab);
   if (!name) {
-    $('pageTitle').textContent = 'لا توجد صلاحيات';
-    document.querySelector('main').innerHTML = '<div class="card empty">حسابك ما عليه أي صلاحية. كلّم مدير النظام.</div>';
+    $('pageTitle').textContent = 'No permissions';
+    document.querySelector('main').innerHTML = '<div class="card empty">Your account has no permissions. Contact your system administrator.</div>';
     return;
   }
   document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
@@ -140,13 +142,13 @@ async function loadToday() {
     <td>${esc(r.department) || '—'}</td>
     <td class="num">${r.shift_start}–${r.shift_end}</td>
     <td class="num">${hm(r.first_in)}</td>
-    <td class="num">${r.missing_out ? '<span class="pill late">بدون خروج</span>' : hm(r.last_out)}</td>
+    <td class="num">${r.missing_out ? '<span class="pill late">No check-out</span>' : hm(r.last_out)}</td>
     <td class="num">${hhmm(r.worked_minutes)}</td>
     <td class="num ${r.late_minutes ? 'warn' : ''}">${mins(r.late_minutes)}</td>
     <td class="num ${r.early_minutes ? 'warn' : ''}">${mins(r.early_minutes)}</td>
     <td>${pill(r.status)}${r.note ? ` <span class="muted small">${esc(r.note)}</span>` : ''}</td>
-    <td>${r.status === 'absent' && can('leaves.edit') ? `<button class="btn small" data-leave="${esc(r.pin)}" data-date="${r.date}">تسجيل إجازة</button>` : ''}</td>
-  </tr>`).join('') : '<tr><td colspan="11" class="empty">لا يوجد موظفين. أول ما يبصم أحد على الجهاز بيظهر هنا.</td></tr>';
+    <td>${r.status === 'absent' && can('leaves.edit') ? `<button class="btn small" data-leave="${esc(r.pin)}" data-date="${r.date}">Add leave</button>` : ''}</td>
+  </tr>`).join('') : '<tr><td colspan="11" class="empty">No employees yet. They appear here after their first punch on the device.</td></tr>';
 
   document.querySelectorAll('[data-leave]').forEach((b) => (b.onclick = () => {
     showTab('leaves');
@@ -174,13 +176,13 @@ $('repDept').onchange = () => renderReport();
 // Timesheet period for the chosen month: 16th of the previous month to the 15th
 function timesheetLabel(month) {
   const [y, m] = month.split('-').map(Number);
-  const f = (d) => d.toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-  return `${f(new Date(Date.UTC(y, m - 2, 16)))} إلى ${f(new Date(Date.UTC(y, m - 1, 15)))}`;
+  const f = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return `${f(new Date(Date.UTC(y, m - 2, 16)))} to ${f(new Date(Date.UTC(y, m - 1, 15)))}`;
 }
 $('tsExport').onclick = () => {
   const month = $('repMonth').value || meta.today.slice(0, 7);
   const dept = $('repDept').value;
-  toast('التايم شيت من ' + timesheetLabel(month));
+  toast('Timesheet: ' + timesheetLabel(month));
   location.href = `/timesheet.xlsx?month=${month}${dept ? '&department_id=' + dept : ''}`;
 };
 $('repExport').onclick = () => {
@@ -211,21 +213,19 @@ function renderReport() {
     <td class="num">${hhmm(s.late_minutes)}</td>
     <td class="num">${s.early_count ? `${s.early_count} (${hhmm(s.early_minutes)})` : '0'}</td>
     <td class="num">${s.missing_out}</td>
-    <td class="num">${hhmm(s.worked_minutes)}</td>
-  </tr>`).join('') : '<tr><td colspan="12" class="empty">لا توجد بيانات</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="11" class="empty">No data</td></tr>';
   document.querySelectorAll('#repRows tr[data-pin]').forEach((tr) => (tr.onclick = () => showDetail(tr.dataset.pin)));
 }
 
 function showDetail(pin) {
   const days = report.days.filter((d) => d.pin === pin);
   const emp = report.summary.find((s) => s.pin === pin);
-  $('repDetailTitle').textContent = `تفاصيل: ${emp.name || emp.pin}`;
+  $('repDetailTitle').textContent = `Details: ${emp.name || emp.pin}`;
   $('repDetailRows').innerHTML = days.map((r) => `<tr>
     <td class="num">${r.date}</td>
     <td>${r.day_name}</td>
     <td class="num">${hm(r.first_in)}</td>
-    <td class="num">${r.missing_out ? '<span class="pill late">بدون خروج</span>' : hm(r.last_out)}</td>
-    <td class="num">${hhmm(r.worked_minutes)}</td>
+    <td class="num">${r.missing_out ? '<span class="pill late">No check-out</span>' : hm(r.last_out)}</td>
     <td class="num">${mins(r.late_minutes)}</td>
     <td class="num">${mins(r.early_minutes)}</td>
     <td>${pill(r.status)}</td>
@@ -245,23 +245,23 @@ async function loadLeaves() {
     <td class="num">${l.end_date}</td>
     <td class="num">${daysBetween(l.start_date, l.end_date)}</td>
     <td>${esc(l.note) || ''}</td>
-    <td>${can('leaves.edit') ? `<button class="btn small danger" data-del-leave="${l.id}">حذف</button>` : ''}</td>
-  </tr>`).join('') : '<tr><td colspan="7" class="empty">لا توجد إجازات مسجلة</td></tr>';
+    <td>${can('leaves.edit') ? `<button class="btn small danger" data-del-leave="${l.id}">Delete</button>` : ''}</td>
+  </tr>`).join('') : '<tr><td colspan="7" class="empty">No leaves recorded</td></tr>';
   $('holidayRows').innerHTML = holidays.length ? holidays.map((x) => `<tr>
     <td>${esc(x.name)}</td>
     <td class="num">${x.start_date}</td>
     <td class="num">${x.end_date}</td>
     <td class="num">${daysBetween(x.start_date, x.end_date)}</td>
-    <td>${can('holidays.edit') ? `<button class="btn small danger" data-del-holiday="${x.id}">حذف</button>` : ''}</td>
-  </tr>`).join('') : '<tr><td colspan="5" class="empty">لا توجد عطل مسجلة</td></tr>';
+    <td>${can('holidays.edit') ? `<button class="btn small danger" data-del-holiday="${x.id}">Delete</button>` : ''}</td>
+  </tr>`).join('') : '<tr><td colspan="5" class="empty">No holidays recorded</td></tr>';
 
   document.querySelectorAll('[data-del-leave]').forEach((b) => (b.onclick = async () => {
-    if (!confirm('حذف هذي الإجازة؟')) return;
+    if (!confirm('Delete this leave?')) return;
     await send('/api/leaves/' + b.dataset.delLeave, 'DELETE');
     loadLeaves();
   }));
   document.querySelectorAll('[data-del-holiday]').forEach((b) => (b.onclick = async () => {
-    if (!confirm('حذف هذي العطلة؟')) return;
+    if (!confirm('Delete this holiday?')) return;
     await send('/api/holidays/' + b.dataset.delHoliday, 'DELETE');
     loadLeaves();
   }));
@@ -271,7 +271,7 @@ $('leaveForm').onsubmit = async (e) => {
   e.preventDefault();
   await send('/api/leaves', 'POST', formData(e.target));
   e.target.reset();
-  toast('تم حفظ الإجازة');
+  toast('Leave saved');
   report = null;
   loadLeaves();
 };
@@ -279,7 +279,7 @@ $('holidayForm').onsubmit = async (e) => {
   e.preventDefault();
   await send('/api/holidays', 'POST', formData(e.target));
   e.target.reset();
-  toast('تم حفظ العطلة');
+  toast('Holiday saved');
   report = null;
   loadLeaves();
 };
@@ -296,13 +296,13 @@ function renderEmployees() {
     (!q || e.pin.includes(q) || (e.name || '').includes(q)));
   $('empRows').innerHTML = rows.length ? rows.map((e) => `<tr class="${e.active ? '' : 'inactive'}" data-pin="${esc(e.pin)}">
     <td class="num">${esc(e.pin)}</td>
-    <td><input class="name-input" data-field="name" value="${esc(e.name)}" placeholder="اكتب الاسم"></td>
-    <td><select data-field="department_id">${options(meta.departments, e.department_id, 'بدون قسم')}</select></td>
-    <td><select data-field="shift_id">${options(meta.shifts, e.shift_id, 'حسب القسم')}</select></td>
+    <td><input class="name-input" data-field="name" value="${esc(e.name)}" placeholder="Enter name"></td>
+    <td><select data-field="department_id">${options(meta.departments, e.department_id, 'No department')}</select></td>
+    <td><select data-field="shift_id">${options(meta.shifts, e.shift_id, 'From department')}</select></td>
     <td><input type="date" data-field="start_date" value="${e.start_date || ''}"></td>
     <td><input type="checkbox" data-field="active" ${e.active ? 'checked' : ''}></td>
     <td class="num">${e.last_punch ? esc(e.last_punch.slice(0, 16)) : '—'}</td>
-  </tr>`).join('') : '<tr><td colspan="7" class="empty">لا يوجد موظفين</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="7" class="empty">No employees</td></tr>';
 
   if (!can('employees.edit')) document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.disabled = true));
   document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.onchange = async () => {
@@ -315,7 +315,7 @@ function renderEmployees() {
     if (field === 'active') { inp.closest('tr').classList.toggle('inactive', !value); loadEmployeeList(); }
     if (field === 'name') loadEmployeeList();
     report = null;
-    toast('تم الحفظ');
+    toast('Saved');
   }));
 }
 $('empSearch').oninput = renderEmployees;
@@ -332,7 +332,7 @@ async function loadLog() {
     <td class="num">${r.punch_time.slice(11, 19)}</td>
     <td>${VERIFY[r.verify] || r.verify}</td>
     <td>${esc(r.device_name || r.sn)}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">لا توجد بصمات في هذه الفترة</td></tr>';
+    : '<tr><td colspan="6" class="empty">No punches in this period</td></tr>';
 }
 $('loadLog').onclick = loadLog;
 
@@ -341,20 +341,20 @@ function shiftCard(s) {
   const t = (v) => (v || '').slice(0, 5);
   return `<form class="card pad shift" data-id="${s.id || ''}">
     <div class="shift-grid">
-      <label>اسم الوردية <input name="name" value="${esc(s.name)}" required></label>
-      <label>بداية الدوام <input type="time" name="start_time" value="${t(s.start_time)}" required></label>
-      <label>نهاية الدوام <input type="time" name="end_time" value="${t(s.end_time)}" required></label>
-      <label>مهلة التأخير (دقيقة) <input type="number" min="0" name="grace_in" value="${s.grace_in ?? 15}"></label>
-      <label>مهلة الخروج المبكر (دقيقة) <input type="number" min="0" name="grace_out" value="${s.grace_out ?? 0}"></label>
+      <label>Shift name <input name="name" value="${esc(s.name)}" required></label>
+      <label>Start time <input type="time" name="start_time" value="${t(s.start_time)}" required></label>
+      <label>End time <input type="time" name="end_time" value="${t(s.end_time)}" required></label>
+      <label>Late grace (min) <input type="number" min="0" name="grace_in" value="${s.grace_in ?? 15}"></label>
+      <label>Early leave grace (min) <input type="number" min="0" name="grace_out" value="${s.grace_out ?? 0}"></label>
     </div>
-    <div class="weekdays"><span class="muted">العطلة الأسبوعية:</span>
+    <div class="weekdays"><span class="muted">Weekend:</span>
       ${DAYS.map((d, i) => `<label class="check"><input type="checkbox" name="weekend" value="${i}" ${(s.weekend || []).includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}
     </div>
     <div class="actions">
-      <button class="btn primary small">حفظ</button>
-      ${s.is_default ? '<span class="pill ok">الوردية الافتراضية</span>'
-        : s.id ? `<button type="button" class="btn small" data-default>جعلها الافتراضية</button>
-                  <button type="button" class="btn small danger" data-delete>حذف</button>` : ''}
+      <button class="btn primary small">Save</button>
+      ${s.is_default ? '<span class="pill ok">Default shift</span>'
+        : s.id ? `<button type="button" class="btn small" data-default>Make default</button>
+                  <button type="button" class="btn small danger" data-delete>Delete</button>` : ''}
     </div>
   </form>`;
 }
@@ -377,10 +377,10 @@ async function loadSettings() {
   employees.forEach((e) => { if (e.active && e.department_id) counts[e.department_id] = (counts[e.department_id] || 0) + 1; });
   $('deptRows').innerHTML = meta.departments.length ? meta.departments.map((d) => `<tr data-id="${d.id}">
     <td><input class="name-input" data-dept="name" value="${esc(d.name)}"></td>
-    <td><select data-dept="shift_id">${options(meta.shifts, d.shift_id, 'الوردية الافتراضية')}</select></td>
+    <td><select data-dept="shift_id">${options(meta.shifts, d.shift_id, 'Default shift')}</select></td>
     <td class="num">${counts[d.id] || 0}</td>
-    <td><button class="btn small danger" data-del-dept>حذف</button></td>
-  </tr>`).join('') : '<tr><td colspan="4" class="empty">لا توجد أقسام. أضف قسم من الأسفل.</td></tr>';
+    <td><button class="btn small danger" data-del-dept>Delete</button></td>
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">No departments yet. Add one below.</td></tr>';
 
   document.querySelectorAll('#deptRows tr[data-id]').forEach((tr) => {
     const save = async () => {
@@ -390,11 +390,11 @@ async function loadSettings() {
       });
       report = null;
       await loadMeta();
-      toast('تم حفظ القسم');
+      toast('Department saved');
     };
     tr.querySelectorAll('[data-dept]').forEach((el) => (el.onchange = save));
     tr.querySelector('[data-del-dept]').onclick = async () => {
-      if (!confirm('حذف القسم؟ الموظفين اللي فيه يصيرون بدون قسم.')) return;
+      if (!confirm('Delete this department? Its employees will have no department.')) return;
       await send('/api/departments/' + tr.dataset.id, 'DELETE');
       report = null;
       loadSettings();
@@ -410,7 +410,7 @@ function bindShiftForms() {
       if (id) await send('/api/shifts/' + id, 'PUT', shiftData(form));
       else await send('/api/shifts', 'POST', shiftData(form));
       report = null;
-      toast('تم حفظ الوردية');
+      toast('Shift saved');
       loadSettings();
     };
     const def = form.querySelector('[data-default]');
@@ -421,7 +421,7 @@ function bindShiftForms() {
     };
     const del = form.querySelector('[data-delete]');
     if (del) del.onclick = async () => {
-      if (!confirm('حذف الوردية؟ الموظفين عليها يرجعون لوردية القسم أو الافتراضية.')) return;
+      if (!confirm('Delete this shift? Its employees fall back to their department shift or the default.')) return;
       await send('/api/shifts/' + id, 'DELETE');
       report = null;
       loadSettings();
@@ -450,31 +450,31 @@ async function loadDevices() {
   $('deviceList').innerHTML = rows.length ? rows.map((d) => {
     const online = Date.now() - new Date(d.last_seen).getTime() < 3 * 60 * 1000;
     return `<div class="card device">
-      <div><span class="dot ${online ? 'on' : 'off'}"></span><strong>${esc(d.name || 'جهاز البصمة')}</strong>
-        <span class="muted"> · ${online ? 'متصل' : 'غير متصل'}</span></div>
+      <div><span class="dot ${online ? 'on' : 'off'}"></span><strong>${esc(d.name || 'Fingerprint device')}</strong>
+        <span class="muted"> · ${online ? 'Online' : 'Offline'}</span></div>
       <div class="row">
-        <span>الرقم التسلسلي: <span class="num">${esc(d.sn)}</span></span>
-        <span>آخر اتصال: <span class="num">${new Date(d.last_seen).toLocaleString('ar-SA-u-nu-latn')}</span></span>
-        <span>إجمالي البصمات: <span class="num">${d.total}</span></span>
-        ${d.pending ? `<span>أوامر بالانتظار: <span class="num">${d.pending}</span></span>` : ''}
+        <span>Serial number: <span class="num">${esc(d.sn)}</span></span>
+        <span>Last seen: <span class="num">${dateTime(d.last_seen)}</span></span>
+        <span>Total punches: <span class="num">${d.total}</span></span>
+        ${d.pending ? `<span>Pending commands: <span class="num">${d.pending}</span></span>` : ''}
       </div>
       <div class="actions" ${can('devices.manage') ? '' : 'hidden'}>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">سحب أسماء الموظفين من الجهاز</button>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="resend-logs">إعادة سحب كل البصمات</button>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">تسمية الجهاز</button>
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">Pull employee names from device</button>
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="resend-logs">Re-pull all punches</button>
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">Rename device</button>
       </div></div>`;
-  }).join('') : '<div class="card empty">لم يتصل أي جهاز بعد. اضبط إعدادات Cloud Server في الجهاز، وبيظهر هنا خلال دقيقة.</div>';
+  }).join('') : '<div class="card empty">No device has connected yet. Set up Cloud Server on the device and it will appear here within a minute.</div>';
   document.querySelectorAll('[data-act]').forEach((b) => {
     b.onclick = async () => {
       const sn = b.dataset.sn;
       if (b.dataset.act === 'rename') {
-        const name = prompt('اسم الجهاز (مثلاً: المدخل الرئيسي)');
+        const name = prompt('Device name (e.g. Main entrance)');
         if (name === null) return;
         await send('/api/devices/' + encodeURIComponent(sn), 'PUT', { name });
         return loadDevices();
       }
       await send(`/api/devices/${encodeURIComponent(sn)}/${b.dataset.act}`, 'POST');
-      toast('تم إرسال الأمر، الجهاز بينفذه خلال ثواني');
+      toast('Command sent, the device will run it within seconds');
       loadDevices();
     };
   });
@@ -483,8 +483,6 @@ async function loadDevices() {
 /* ---------------- Users & permissions ---------------- */
 let roles = [];
 let users = [];
-// "YYYY-MM-DD HH:MM" in the browser's local time
-const dateTime = (ts) => (ts ? new Date(ts).toLocaleString('sv-SE').slice(0, 16) : '—');
 
 async function loadUsers() {
   [users, roles] = await Promise.all([api('/api/users'), api('/api/roles')]);
@@ -492,19 +490,19 @@ async function loadUsers() {
     <td>${esc(u.name) || '—'}</td>
     <td class="num">${esc(u.username)}</td>
     <td>${esc(u.role) || '—'}</td>
-    <td>${u.active ? '<span class="pill ok">نشط</span>' : '<span class="pill absent">موقوف</span>'}</td>
+    <td>${u.active ? '<span class="pill ok">Active</span>' : '<span class="pill absent">Inactive</span>'}</td>
     <td class="num">${dateTime(u.last_login)}</td>
     <td>
-      <button class="btn small" data-edit-user="${u.id}">تعديل</button>
-      ${u.id === meta.me.id ? '' : `<button class="btn small danger" data-del-user="${u.id}">حذف</button>`}
+      <button class="btn small" data-edit-user="${u.id}">Edit</button>
+      ${u.id === meta.me.id ? '' : `<button class="btn small danger" data-del-user="${u.id}">Delete</button>`}
     </td>
-  </tr>`).join('') : '<tr><td colspan="6" class="empty">ما فيه مستخدمين بعد. أضف أول مستخدم من زر "مستخدم جديد".</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="6" class="empty">No users yet. Add the first one with "New user".</td></tr>';
   document.querySelectorAll('[data-edit-user]').forEach((b) => (b.onclick = () => openUserDialog(users.find((u) => u.id === Number(b.dataset.editUser)))));
   document.querySelectorAll('[data-del-user]').forEach((b) => (b.onclick = async () => {
     const u = users.find((x) => x.id === Number(b.dataset.delUser));
-    if (!confirm(`حذف المستخدم ${u.name || u.username}؟`)) return;
+    if (!confirm(`Delete user ${u.name || u.username}?`)) return;
     await send('/api/users/' + u.id, 'DELETE');
-    toast('تم حذف المستخدم');
+    toast('User deleted');
     loadUsers();
   }));
 
@@ -520,17 +518,17 @@ async function loadAudit() {
     <td class="num">${esc(r.username) || '—'}</td>
     <td>${esc(r.action)}</td>
     <td class="wrap">${esc(r.details) || ''}</td>
-  </tr>`).join('') : '<tr><td colspan="4" class="empty">لا توجد عمليات بعد</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">No activity yet</td></tr>';
 }
 
 function roleCard(r) {
   const groups = [...new Set(meta.permissionList.map((p) => p.group))];
   return `<form class="card pad role" data-id="${r.id || ''}">
     <div class="role-head">
-      <label>اسم الدور <input name="name" value="${esc(r.name)}" required></label>
-      <span class="muted small">${r.id ? `${r.users} مستخدم` : 'دور جديد'}</span>
+      <label>Role name <input name="name" value="${esc(r.name)}" required></label>
+      <span class="muted small">${r.id ? `${r.users} user${r.users === 1 ? '' : 's'}` : 'New role'}</span>
     </div>
-    ${r.is_system ? '<p class="muted small">هذا دور مدير النظام وله كل الصلاحيات دائماً.</p>' : ''}
+    ${r.is_system ? '<p class="muted small">This is the system admin role and always has every permission.</p>' : ''}
     <div class="perm-groups">
       ${groups.map((g) => `<div class="perm-group"><div class="perm-title">${esc(g)}</div>
         ${meta.permissionList.filter((p) => p.group === g).map((p) => `<label class="check">
@@ -539,9 +537,9 @@ function roleCard(r) {
       </div>`).join('')}
     </div>
     <div class="actions">
-      <button class="btn primary small">حفظ</button>
-      ${!r.is_system ? `<button type="button" class="btn small" data-select-all>تحديد الكل</button>` : ''}
-      ${r.id && !r.is_system ? '<button type="button" class="btn small danger" data-delete>حذف</button>' : ''}
+      <button class="btn primary small">Save</button>
+      ${!r.is_system ? `<button type="button" class="btn small" data-select-all>Select all</button>` : ''}
+      ${r.id && !r.is_system ? '<button type="button" class="btn small danger" data-delete>Delete</button>' : ''}
     </div>
   </form>`;
 }
@@ -554,7 +552,7 @@ function bindRoleForms() {
       const fd = new FormData(form);
       const body = { name: fd.get('name'), permissions: fd.getAll('permissions') };
       await send(id ? '/api/roles/' + id : '/api/roles', id ? 'PUT' : 'POST', body);
-      toast('تم حفظ الدور');
+      toast('Role saved');
       if (Number(id) && meta.me.builtin === false) { await loadMeta(); applyPermissions(); }
       loadUsers();
     };
@@ -566,7 +564,7 @@ function bindRoleForms() {
     };
     const del = form.querySelector('[data-delete]');
     if (del) del.onclick = async () => {
-      if (!confirm('حذف الدور؟')) return;
+      if (!confirm('Delete this role?')) return;
       await send('/api/roles/' + id, 'DELETE');
       loadUsers();
     };
@@ -585,8 +583,8 @@ function openUserDialog(user) {
   editingUser = user || null;
   const f = $('userForm');
   f.reset();
-  $('userDialogTitle').textContent = user ? 'تعديل مستخدم' : 'مستخدم جديد';
-  $('pwLabel').textContent = user ? 'كلمة مرور جديدة (اتركها فاضية إذا ما تبي تغيرها)' : 'كلمة المرور (6 أحرف على الأقل)';
+  $('userDialogTitle').textContent = user ? 'Edit user' : 'New user';
+  $('pwLabel').textContent = user ? 'New password (leave empty to keep it)' : 'Password (at least 6 characters)';
   f.role_id.innerHTML = options(roles, user ? user.role_id : (roles.find((r) => !r.is_system) || roles[0] || {}).id);
   f.name.value = user ? user.name || '' : '';
   f.username.value = user ? user.username : '';
@@ -606,7 +604,7 @@ $('userForm').onsubmit = async (e) => {
   if (editingUser) await send('/api/users/' + editingUser.id, 'PUT', body);
   else await send('/api/users', 'POST', { ...body, username: f.username.value.trim() });
   $('userDialog').close();
-  toast('تم حفظ المستخدم');
+  toast('User saved');
   loadUsers();
 };
 
@@ -632,7 +630,7 @@ $('passwordForm').onsubmit = async (e) => {
   $('repMonth').value = today.slice(0, 7);
   setMonth(today.slice(0, 7));
   $('leaveType').innerHTML = meta.leaveTypes.map((t) => `<option>${esc(t)}</option>`).join('');
-  $('topDate').textContent = new Date(today + 'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',
+  $('topDate').textContent = new Date(today + 'T12:00:00Z').toLocaleDateString('en-GB',
     { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
   applyPermissions();
   showTab(location.hash.slice(1) || 'today');

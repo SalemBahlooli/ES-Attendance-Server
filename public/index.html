@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f6e56">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="الحضور">
+<meta name="apple-mobile-web-app-title" content="Attendance">
 <link rel="manifest" href="/static/manifest.webmanifest">
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
-<title>نظام الحضور</title>
+<title>Attendance System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -32,31 +32,31 @@
 
 <div class="app">
 <aside class="sidebar">
-  <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-brand"/></svg></span>نظام الحضور</div>
+  <div class="brand"><span class="brand-icon"><svg class="icon"><use href="#i-brand"/></svg></span>Attendance</div>
   <nav class="side-nav">
-    <div class="nav-label">الحضور</div>
-    <button class="nav-item active" data-tab="today"><svg class="icon"><use href="#i-today"/></svg>الحضور اليومي</button>
-    <button class="nav-item" data-tab="report"><svg class="icon"><use href="#i-report"/></svg>التقرير</button>
-    <button class="nav-item" data-tab="leaves"><svg class="icon"><use href="#i-leaves"/></svg>الإجازات والعطل</button>
-    <div class="nav-label">الإدارة</div>
-    <button class="nav-item" data-tab="employees"><svg class="icon"><use href="#i-employees"/></svg>الموظفين</button>
-    <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>سجل البصمات</button>
-    <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>الورديات والأقسام</button>
-    <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>الأجهزة</button>
-    <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>المستخدمين والصلاحيات</button>
+    <div class="nav-label">Attendance</div>
+    <button class="nav-item active" data-tab="today"><svg class="icon"><use href="#i-today"/></svg>Daily attendance</button>
+    <button class="nav-item" data-tab="report"><svg class="icon"><use href="#i-report"/></svg>Report</button>
+    <button class="nav-item" data-tab="leaves"><svg class="icon"><use href="#i-leaves"/></svg>Leaves &amp; holidays</button>
+    <div class="nav-label">Management</div>
+    <button class="nav-item" data-tab="employees"><svg class="icon"><use href="#i-employees"/></svg>Employees</button>
+    <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>Punch log</button>
+    <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>Shifts &amp; departments</button>
+    <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>Devices</button>
+    <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>Users &amp; permissions</button>
   </nav>
   <div class="user-box">
     <div class="user-name" id="meName"></div>
     <div class="muted small" id="meRole"></div>
   </div>
-  <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>تغيير كلمة المرور</button>
-  <a class="nav-item" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>تسجيل خروج</a>
+  <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>Change password</button>
+  <a class="nav-item" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>Sign out</a>
 </aside>
 
 <div class="content">
 <div class="topbar">
   <span class="brand-icon top-brand"><svg class="icon"><use href="#i-brand"/></svg></span>
-  <h1 id="pageTitle">الحضور اليومي</h1>
+  <h1 id="pageTitle">Daily attendance</h1>
   <span class="muted top-date" id="topDate"></span>
 </div>
 
@@ -65,20 +65,20 @@
   <section id="tab-today">
     <div class="toolbar">
       <input type="date" id="day">
-      <button class="btn" id="prevDay">اليوم السابق</button>
-      <button class="btn" id="todayBtn">اليوم</button>
+      <button class="btn" id="prevDay">Previous day</button>
+      <button class="btn" id="todayBtn">Today</button>
       <select class="dept-filter" id="todayDept"></select>
     </div>
     <div class="stats">
-      <div class="stat"><div class="label">حاضر</div><div class="value num" id="sPresent">0</div></div>
-      <div class="stat"><div class="label">متأخر</div><div class="value num warn" id="sLate">0</div></div>
-      <div class="stat"><div class="label">غائب</div><div class="value num danger" id="sAbsent">0</div></div>
-      <div class="stat"><div class="label">إجازة</div><div class="value num info" id="sLeave">0</div></div>
-      <div class="stat"><div class="label">لم يبصم بعد</div><div class="value num muted" id="sNotYet">0</div></div>
+      <div class="stat"><div class="label">Present</div><div class="value num" id="sPresent">0</div></div>
+      <div class="stat"><div class="label">Late</div><div class="value num warn" id="sLate">0</div></div>
+      <div class="stat"><div class="label">Absent</div><div class="value num danger" id="sAbsent">0</div></div>
+      <div class="stat"><div class="label">On leave</div><div class="value num info" id="sLeave">0</div></div>
+      <div class="stat"><div class="label">Not in yet</div><div class="value num muted" id="sNotYet">0</div></div>
     </div>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>الدوام</th><th>الدخول</th><th>الخروج</th><th>ساعات العمل</th><th>تأخير</th><th>خروج مبكر</th><th>الحالة</th><th></th></tr></thead>
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>In</th><th>Out</th><th>Worked</th><th>Late</th><th>Early leave</th><th>Status</th><th></th></tr></thead>
         <tbody id="todayRows"></tbody>
       </table>
     </div>
@@ -87,19 +87,19 @@
   <!-- Report -->
   <section id="tab-report" hidden>
     <div class="toolbar">
-      <label>الشهر <input type="month" id="repMonth"></label>
-      <label>من <input type="date" id="repFrom"></label>
-      <label>إلى <input type="date" id="repTo"></label>
+      <label>Month <input type="month" id="repMonth"></label>
+      <label>From <input type="date" id="repFrom"></label>
+      <label>To <input type="date" id="repTo"></label>
       <select class="dept-filter" id="repDept"></select>
-      <button class="btn" id="loadReport">عرض</button>
+      <button class="btn" id="loadReport">Show</button>
       <span class="spacer"></span>
-      <button class="btn" id="tsExport" data-perm="report.export">التايم شيت</button>
-      <button class="btn primary" id="repExport" data-perm="report.export">تصدير Excel</button>
+      <button class="btn" id="tsExport" data-perm="report.export">Timesheet</button>
+      <button class="btn primary" id="repExport" data-perm="report.export">Export Excel</button>
     </div>
-    <p class="muted hint">اضغط على أي موظف لعرض تفاصيل أيامه.</p>
+    <p class="muted hint">Click an employee to see their daily details.</p>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>أيام العمل</th><th>حضور</th><th>غياب</th><th>إجازة</th><th>مرات التأخير</th><th>مجموع التأخير</th><th>خروج مبكر</th><th>بدون بصمة خروج</th><th>ساعات العمل</th></tr></thead>
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Work days</th><th>Present</th><th>Absent</th><th>Leave</th><th>Times late</th><th>Total late</th><th>Early leave</th><th>No check-out</th></tr></thead>
         <tbody id="repRows"></tbody>
       </table>
     </div>
@@ -107,7 +107,7 @@
       <h3 id="repDetailTitle"></h3>
       <div class="card table-wrap">
         <table>
-          <thead><tr><th>التاريخ</th><th>اليوم</th><th>الدخول</th><th>الخروج</th><th>ساعات العمل</th><th>تأخير</th><th>خروج مبكر</th><th>الحالة</th><th>ملاحظة</th></tr></thead>
+          <thead><tr><th>Date</th><th>Day</th><th>In</th><th>Out</th><th>Late</th><th>Early leave</th><th>Status</th><th>Note</th></tr></thead>
           <tbody id="repDetailRows"></tbody>
         </table>
       </div>
@@ -118,42 +118,42 @@
   <section id="tab-leaves" hidden>
     <div class="grid-2">
       <div class="card pad" data-perm="leaves.edit">
-        <h3>تسجيل إجازة موظف</h3>
+        <h3>Add employee leave</h3>
         <form id="leaveForm" class="form">
-          <label>الموظف <select name="pin" id="leavePin" required></select></label>
-          <label>النوع <select name="type" id="leaveType"></select></label>
+          <label>Employee <select name="pin" id="leavePin" required></select></label>
+          <label>Type <select name="type" id="leaveType"></select></label>
           <div class="row-2">
-            <label>من <input type="date" name="start_date" id="leaveFrom" required></label>
-            <label>إلى <input type="date" name="end_date" id="leaveTo" required></label>
+            <label>From <input type="date" name="start_date" id="leaveFrom" required></label>
+            <label>To <input type="date" name="end_date" id="leaveTo" required></label>
           </div>
-          <label>ملاحظة <input name="note" placeholder="اختياري"></label>
-          <button class="btn primary">حفظ الإجازة</button>
+          <label>Note <input name="note" placeholder="Optional"></label>
+          <button class="btn primary">Save leave</button>
         </form>
       </div>
       <div class="card pad" data-perm="holidays.edit">
-        <h3>إضافة عطلة رسمية</h3>
-        <p class="muted small">العطلة الرسمية تنطبق على كل الموظفين (مثل عيد الفطر أو اليوم الوطني).</p>
+        <h3>Add public holiday</h3>
+        <p class="muted small">A public holiday applies to every employee (e.g. Eid or National Day).</p>
         <form id="holidayForm" class="form">
-          <label>الاسم <input name="name" placeholder="مثلاً: عيد الأضحى" required></label>
+          <label>Name <input name="name" placeholder="e.g. Eid Al-Adha" required></label>
           <div class="row-2">
-            <label>من <input type="date" name="start_date" required></label>
-            <label>إلى <input type="date" name="end_date" required></label>
+            <label>From <input type="date" name="start_date" required></label>
+            <label>To <input type="date" name="end_date" required></label>
           </div>
-          <button class="btn primary">حفظ العطلة</button>
+          <button class="btn primary">Save holiday</button>
         </form>
       </div>
     </div>
-    <h3>الإجازات</h3>
+    <h3>Leaves</h3>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الموظف</th><th>النوع</th><th>من</th><th>إلى</th><th>الأيام</th><th>ملاحظة</th><th></th></tr></thead>
+        <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Note</th><th></th></tr></thead>
         <tbody id="leaveRows"></tbody>
       </table>
     </div>
-    <h3>العطل الرسمية</h3>
+    <h3>Public holidays</h3>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الاسم</th><th>من</th><th>إلى</th><th>الأيام</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>From</th><th>To</th><th>Days</th><th></th></tr></thead>
         <tbody id="holidayRows"></tbody>
       </table>
     </div>
@@ -162,14 +162,14 @@
   <!-- Employees -->
   <section id="tab-employees" hidden>
     <div class="toolbar">
-      <input type="search" id="empSearch" placeholder="بحث بالاسم أو الرقم">
-      <label class="check"><input type="checkbox" id="empShowInactive"> عرض الموظفين الموقوفين</label>
+      <input type="search" id="empSearch" placeholder="Search by name or ID">
+      <label class="check"><input type="checkbox" id="empShowInactive"> Show inactive employees</label>
     </div>
-    <p class="muted hint">أي تعديل يُحفظ تلقائياً. الموظف "الموقوف" ما يظهر في الحضور ولا يُحسب غائب (مثلاً اللي ترك العمل).
-      إذا ما حددت تاريخ المباشرة، يبدأ الحساب من أول بصمة للموظف.</p>
+    <p class="muted hint">Changes save automatically. Inactive employees don't appear in attendance and aren't counted absent (e.g. someone who left).
+      Without a start date, counting starts from the employee's first punch.</p>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الرقم</th><th>الاسم</th><th>القسم</th><th>الوردية</th><th>تاريخ المباشرة</th><th>نشط</th><th>آخر بصمة</th></tr></thead>
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>Start date</th><th>Active</th><th>Last punch</th></tr></thead>
         <tbody id="empRows"></tbody>
       </table>
     </div>
@@ -178,14 +178,14 @@
   <!-- Punch log -->
   <section id="tab-log" hidden>
     <div class="toolbar">
-      <label>من <input type="date" id="from"></label>
-      <label>إلى <input type="date" id="to"></label>
-      <select id="pinFilter"><option value="">كل الموظفين</option></select>
-      <button class="btn" id="loadLog">عرض</button>
+      <label>From <input type="date" id="from"></label>
+      <label>To <input type="date" id="to"></label>
+      <select id="pinFilter"><option value="">All employees</option></select>
+      <button class="btn" id="loadLog">Show</button>
     </div>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الرقم</th><th>الاسم</th><th>التاريخ</th><th>الوقت</th><th>طريقة التحقق</th><th>الجهاز</th></tr></thead>
+        <thead><tr><th>ID</th><th>Name</th><th>Date</th><th>Time</th><th>Verified by</th><th>Device</th></tr></thead>
         <tbody id="logRows"></tbody>
       </table>
     </div>
@@ -193,24 +193,24 @@
 
   <!-- Shifts & departments -->
   <section id="tab-settings" hidden>
-    <h3>الورديات</h3>
+    <h3>Shifts</h3>
     <p class="muted hint">
-      مهلة التأخير: لو بصم الموظف بعد بداية الدوام بأكثر منها يُحسب متأخر (بكامل دقائق التأخير).
-      الوردية الافتراضية تنطبق على أي موظف ما له وردية ولا قسمه له وردية.
+      Late grace: an employee who punches in later than this after the shift start counts as late (for the full minutes).
+      The default shift applies to anyone with no shift of their own and no department shift.
     </p>
     <div id="shiftList" class="shift-list"></div>
-    <button class="btn" id="addShift">+ إضافة وردية</button>
+    <button class="btn" id="addShift">+ Add shift</button>
 
-    <h3>الأقسام</h3>
+    <h3>Departments</h3>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>القسم</th><th>وردية القسم</th><th>عدد الموظفين</th><th></th></tr></thead>
+        <thead><tr><th>Department</th><th>Department shift</th><th>Employees</th><th></th></tr></thead>
         <tbody id="deptRows"></tbody>
       </table>
     </div>
     <form id="deptForm" class="toolbar top-gap">
-      <input name="name" placeholder="اسم قسم جديد" required>
-      <button class="btn">+ إضافة قسم</button>
+      <input name="name" placeholder="New department name" required>
+      <button class="btn">+ Add department</button>
     </form>
   </section>
 
@@ -221,28 +221,28 @@
   <!-- Users & permissions -->
   <section id="tab-users" hidden>
     <div class="section-head">
-      <h3>المستخدمين</h3>
-      <button class="btn primary" id="addUser">+ مستخدم جديد</button>
+      <h3>Users</h3>
+      <button class="btn primary" id="addUser">+ New user</button>
     </div>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
         <tbody id="userRows"></tbody>
       </table>
     </div>
-    <p class="muted hint top-gap">حساب <span class="num">admin</span> هو حساب المالك الأساسي، كلمة مروره من متغير ADMIN_PASSWORD في Railway وله كل الصلاحيات دائماً.</p>
+    <p class="muted hint top-gap">The <span class="num">admin</span> account is the built-in owner account. Its password is the ADMIN_PASSWORD variable in Railway and it always has every permission.</p>
 
     <div class="section-head">
-      <h3>الأدوار والصلاحيات</h3>
-      <button class="btn" id="addRole">+ دور جديد</button>
+      <h3>Roles &amp; permissions</h3>
+      <button class="btn" id="addRole">+ New role</button>
     </div>
-    <p class="muted hint">الدور مجموعة صلاحيات، وكل مستخدم تعطيه دور واحد. أي تعديل على الدور ينطبق فوراً على كل مستخدميه.</p>
+    <p class="muted hint">A role is a set of permissions, and each user gets one role. Changes to a role apply right away to all its users.</p>
     <div id="roleList" class="shift-list"></div>
 
-    <h3>سجل العمليات</h3>
+    <h3>Audit log</h3>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead>
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
         <tbody id="auditRows"></tbody>
       </table>
     </div>
@@ -252,45 +252,45 @@
 </div>
 
 <nav class="bottom-nav">
-  <button data-tab="today" class="active"><svg class="icon"><use href="#i-today"/></svg><span>اليومي</span></button>
-  <button data-tab="report"><svg class="icon"><use href="#i-report"/></svg><span>التقرير</span></button>
-  <button data-tab="leaves"><svg class="icon"><use href="#i-leaves"/></svg><span>الإجازات</span></button>
-  <button data-tab="employees"><svg class="icon"><use href="#i-employees"/></svg><span>الموظفين</span></button>
-  <button id="moreBtn"><svg class="icon"><use href="#i-more"/></svg><span>المزيد</span></button>
+  <button data-tab="today" class="active"><svg class="icon"><use href="#i-today"/></svg><span>Today</span></button>
+  <button data-tab="report"><svg class="icon"><use href="#i-report"/></svg><span>Report</span></button>
+  <button data-tab="leaves"><svg class="icon"><use href="#i-leaves"/></svg><span>Leaves</span></button>
+  <button data-tab="employees"><svg class="icon"><use href="#i-employees"/></svg><span>Employees</span></button>
+  <button id="moreBtn"><svg class="icon"><use href="#i-more"/></svg><span>More</span></button>
 </nav>
 <div class="more-sheet" id="moreSheet" hidden>
-    <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>سجل البصمات</button>
-    <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>الورديات والأقسام</button>
-    <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>الأجهزة</button>
-    <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>المستخدمين والصلاحيات</button>
+    <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>Punch log</button>
+    <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>Shifts &amp; departments</button>
+    <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>Devices</button>
+    <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>Users &amp; permissions</button>
   <div class="sheet-sep"></div>
-  <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>تغيير كلمة المرور</button>
-  <a class="nav-item" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>تسجيل خروج</a>
+  <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>Change password</button>
+  <a class="nav-item" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>Sign out</a>
 </div>
 
 <dialog id="userDialog" class="dialog">
   <form method="dialog" class="form" id="userForm">
-    <h3 id="userDialogTitle">مستخدم جديد</h3>
-    <label>الاسم <input name="name" placeholder="مثلاً: محمد العتيبي"></label>
-    <label>اسم المستخدم <input name="username" dir="ltr" autocapitalize="none" placeholder="mohammed" required></label>
-    <label><span id="pwLabel">كلمة المرور</span> <input name="password" type="password" autocomplete="new-password" minlength="6"></label>
-    <label>الدور <select name="role_id" required></select></label>
-    <label class="check"><input type="checkbox" name="active" checked> الحساب نشط</label>
+    <h3 id="userDialogTitle">New user</h3>
+    <label>Full name <input name="name" placeholder="e.g. Mohammed Alotaibi"></label>
+    <label>Username <input name="username" autocapitalize="none" placeholder="mohammed" required></label>
+    <label><span id="pwLabel">Password</span> <input name="password" type="password" autocomplete="new-password" minlength="6"></label>
+    <label>Role <select name="role_id" required></select></label>
+    <label class="check"><input type="checkbox" name="active" checked> Account active</label>
     <div class="dialog-actions">
-      <button class="btn primary" value="save">حفظ</button>
-      <button class="btn" value="cancel" formnovalidate>إلغاء</button>
+      <button class="btn primary" value="save">Save</button>
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
     </div>
   </form>
 </dialog>
 
 <dialog id="passwordDialog" class="dialog">
   <form method="dialog" class="form" id="passwordForm">
-    <h3>تغيير كلمة المرور</h3>
-    <label>كلمة المرور الحالية <input name="current" type="password" autocomplete="current-password" required></label>
-    <label>كلمة المرور الجديدة <input name="password" type="password" autocomplete="new-password" minlength="6" required></label>
+    <h3>Change password</h3>
+    <label>Current password <input name="current" type="password" autocomplete="current-password" required></label>
+    <label>New password <input name="password" type="password" autocomplete="new-password" minlength="6" required></label>
     <div class="dialog-actions">
-      <button class="btn primary" value="save">حفظ</button>
-      <button class="btn" value="cancel" formnovalidate>إلغاء</button>
+      <button class="btn primary" value="save">Save</button>
+      <button class="btn" value="cancel" formnovalidate>Cancel</button>
     </div>
   </form>
 </dialog>

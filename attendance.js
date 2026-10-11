@@ -11,19 +11,19 @@ const WINDOW_BEFORE = 4 * 60 * MIN;
 const MIN_GAP = 5 * MIN;
 
 const STATUS = {
-  present: 'حاضر',
-  late: 'متأخر',
-  absent: 'غائب',
-  leave: 'إجازة',
-  holiday: 'عطلة رسمية',
-  weekend: 'عطلة أسبوعية',
-  offday_work: 'دوام في يوم عطلة',
-  not_yet: 'لم يبصم بعد',
+  present: 'Present',
+  late: 'Late',
+  absent: 'Absent',
+  leave: 'On leave',
+  holiday: 'Public holiday',
+  weekend: 'Weekend',
+  offday_work: 'Worked day off',
+  not_yet: 'Not in yet',
 };
 
-const LEAVE_TYPES = ['سنوية', 'مرضية', 'اضطرارية', 'بدون راتب', 'مهمة عمل', 'أخرى'];
+const LEAVE_TYPES = ['Annual', 'Sick', 'Emergency', 'Unpaid', 'Business trip', 'Other'];
 
-const DAY_NAMES = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const dayMs = (date) => Date.parse(date + 'T00:00:00Z');
 const tsMs = (ts) => Date.parse(String(ts).slice(0, 19).replace(' ', 'T') + 'Z');

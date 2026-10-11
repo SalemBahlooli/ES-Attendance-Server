@@ -14,7 +14,7 @@ const STATUS_FILL = {
 };
 
 function addSheet(wb, name, columns, rows) {
-  const ws = wb.addWorksheet(name, { views: [{ rightToLeft: true, state: 'frozen', ySplit: 1 }] });
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = columns.map(([header, key, width]) => ({ header, key, width: width || 14 }));
   const head = ws.getRow(1);
   head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -33,12 +33,12 @@ async function buildWorkbook(from, to, departmentId) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'ES Attendance';
 
-  addSheet(wb, 'الملخص', [
-    ['الرقم', 'pin', 10], ['الاسم', 'name', 24], ['القسم', 'department', 16], ['الوردية', 'shift', 16],
-    ['أيام العمل', 'work_days'], ['حضور', 'present', 10], ['غياب', 'absent', 10], ['إجازة', 'leave', 10],
-    ['مرات التأخير', 'late_count'], ['مجموع التأخير', 'late'], ['مرات الخروج المبكر', 'early_count', 18],
-    ['مجموع الخروج المبكر', 'early', 18], ['بدون بصمة خروج', 'missing_out', 16],
-    ['دوام في يوم عطلة', 'offday_work', 16], ['ساعات العمل', 'worked'],
+  addSheet(wb, 'Summary', [
+    ['ID', 'pin', 10], ['Name', 'name', 24], ['Department', 'department', 16], ['Shift', 'shift', 16],
+    ['Work days', 'work_days'], ['Present', 'present', 10], ['Absent', 'absent', 10], ['Leave', 'leave', 10],
+    ['Times late', 'late_count'], ['Total late', 'late'], ['Times left early', 'early_count', 18],
+    ['Total early leave', 'early', 18], ['No check-out', 'missing_out', 16],
+    ['Worked days off', 'offday_work', 16], ['Worked hours', 'worked'],
   ], summary.filter(inDept).map((s) => ({
     ...s,
     late: hhmm(s.late_minutes),
@@ -46,15 +46,15 @@ async function buildWorkbook(from, to, departmentId) {
     worked: hhmm(s.worked_minutes),
   })));
 
-  const detail = addSheet(wb, 'التفصيلي', [
-    ['التاريخ', 'date', 12], ['اليوم', 'day_name', 11], ['الرقم', 'pin', 10], ['الاسم', 'name', 24],
-    ['القسم', 'department', 16], ['الوردية', 'shift', 16], ['الدخول', 'in', 10], ['الخروج', 'out', 10],
-    ['ساعات العمل', 'worked'], ['التأخير (دقيقة)', 'late_minutes', 15], ['الخروج المبكر (دقيقة)', 'early_minutes', 19],
-    ['الحالة', 'status_label', 16], ['ملاحظة', 'note', 24],
+  const detail = addSheet(wb, 'Daily', [
+    ['Date', 'date', 12], ['Day', 'day_name', 11], ['ID', 'pin', 10], ['Name', 'name', 24],
+    ['Department', 'department', 16], ['Shift', 'shift', 16], ['In', 'in', 10], ['Out', 'out', 10],
+    ['Worked', 'worked'], ['Late (min)', 'late_minutes', 15], ['Early leave (min)', 'early_minutes', 19],
+    ['Status', 'status_label', 16], ['Note', 'note', 24],
   ], days.filter(inDept).map((d) => ({
     ...d,
     in: time(d.first_in),
-    out: d.missing_out ? 'لا يوجد' : time(d.last_out),
+    out: d.missing_out ? 'None' : time(d.last_out),
     worked: hhmm(d.worked_minutes),
     late_minutes: d.late_minutes || '',
     early_minutes: d.early_minutes || '',
@@ -78,8 +78,8 @@ async function buildWorkbook(from, to, departmentId) {
      WHERE ${where} ORDER BY a.punch_time`,
     params
   );
-  addSheet(wb, 'البصمات', [
-    ['الرقم', 'pin', 10], ['الاسم', 'name', 24], ['التاريخ', 'day', 12], ['الوقت', 'time', 10], ['الجهاز', 'device', 18],
+  addSheet(wb, 'Punches', [
+    ['ID', 'pin', 10], ['Name', 'name', 24], ['Date', 'day', 12], ['Time', 'time', 10], ['Device', 'device', 18],
   ], punches);
 
   return wb;

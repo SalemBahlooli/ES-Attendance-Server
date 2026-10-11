@@ -4,7 +4,7 @@ const { compute } = require('./attendance');
 // Monthly timesheet in the company's layout: period runs from the 16th of the previous month
 // to the 15th of the chosen month, two rows per employee (attendance codes, then overtime hours).
 
-const LEAVE_CODE = { 'سنوية': 'V', 'مرضية': 'SL', 'بدون راتب': 'U', 'اضطرارية': 'E', 'مهمة عمل': 'LB', 'أخرى': 'E' };
+const LEAVE_CODE = { Annual: 'V', Sick: 'SL', Unpaid: 'U', Emergency: 'E', 'Business trip': 'LB', Other: 'E' };
 const CODES = ['D', 'A', 'F', 'V', 'E', 'SL', 'LB', 'U'];
 const DAY_COLS = 31;
 const FIRST_DAY_COL = 9; // column I
@@ -181,8 +181,8 @@ async function buildTimesheet(month, departmentId) {
   const legend = wb.addWorksheet('Codes');
   legend.columns = [{ header: 'Code', width: 8 }, { header: 'Meaning', width: 34 }];
   legend.addRows([
-    ['D', 'حاضر'], ['A', 'غائب'], ['F', 'عطلة أسبوعية / رسمية'], ['V', 'إجازة سنوية'],
-    ['SL', 'إجازة مرضية'], ['U', 'إجازة بدون راتب'], ['E', 'إجازة اضطرارية / أخرى'], ['LB', 'مهمة عمل'],
+    ['D', 'Present'], ['A', 'Absent'], ['F', 'Weekend / public holiday'], ['V', 'Annual leave'],
+    ['SL', 'Sick leave'], ['U', 'Unpaid leave'], ['E', 'Emergency / other leave'], ['LB', 'Business trip'],
   ]);
   legend.getRow(1).font = { ...FONT, bold: true, color: { argb: 'FFFFFFFF' } };
   legend.getRow(1).eachCell((c) => (c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GREEN } }));
