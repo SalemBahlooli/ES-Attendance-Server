@@ -25,6 +25,8 @@
   <symbol id="i-devices" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></symbol>
   <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></symbol>
   <symbol id="i-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></symbol>
 </svg>
 
@@ -41,8 +43,14 @@
     <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>سجل البصمات</button>
     <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>الورديات والأقسام</button>
     <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>الأجهزة</button>
+    <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>المستخدمين والصلاحيات</button>
   </nav>
-  <a class="nav-item logout" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>تسجيل خروج</a>
+  <div class="user-box">
+    <div class="user-name" id="meName"></div>
+    <div class="muted small" id="meRole"></div>
+  </div>
+  <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>تغيير كلمة المرور</button>
+  <a class="nav-item" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>تسجيل خروج</a>
 </aside>
 
 <div class="content">
@@ -85,7 +93,7 @@
       <select class="dept-filter" id="repDept"></select>
       <button class="btn" id="loadReport">عرض</button>
       <span class="spacer"></span>
-      <button class="btn primary" id="repExport">تصدير Excel</button>
+      <button class="btn primary" id="repExport" data-perm="report.export">تصدير Excel</button>
     </div>
     <p class="muted hint">اضغط على أي موظف لعرض تفاصيل أيامه.</p>
     <div class="card table-wrap">
@@ -108,7 +116,7 @@
   <!-- Leaves & holidays -->
   <section id="tab-leaves" hidden>
     <div class="grid-2">
-      <div class="card pad">
+      <div class="card pad" data-perm="leaves.edit">
         <h3>تسجيل إجازة موظف</h3>
         <form id="leaveForm" class="form">
           <label>الموظف <select name="pin" id="leavePin" required></select></label>
@@ -121,7 +129,7 @@
           <button class="btn primary">حفظ الإجازة</button>
         </form>
       </div>
-      <div class="card pad">
+      <div class="card pad" data-perm="holidays.edit">
         <h3>إضافة عطلة رسمية</h3>
         <p class="muted small">العطلة الرسمية تنطبق على كل الموظفين (مثل عيد الفطر أو اليوم الوطني).</p>
         <form id="holidayForm" class="form">
@@ -209,6 +217,35 @@
   <section id="tab-devices" hidden>
     <div class="device-grid" id="deviceList"></div>
   </section>
+  <!-- Users & permissions -->
+  <section id="tab-users" hidden>
+    <div class="section-head">
+      <h3>المستخدمين</h3>
+      <button class="btn primary" id="addUser">+ مستخدم جديد</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th></th></tr></thead>
+        <tbody id="userRows"></tbody>
+      </table>
+    </div>
+    <p class="muted hint top-gap">حساب <span class="num">admin</span> هو حساب المالك الأساسي، كلمة مروره من متغير ADMIN_PASSWORD في Railway وله كل الصلاحيات دائماً.</p>
+
+    <div class="section-head">
+      <h3>الأدوار والصلاحيات</h3>
+      <button class="btn" id="addRole">+ دور جديد</button>
+    </div>
+    <p class="muted hint">الدور مجموعة صلاحيات، وكل مستخدم تعطيه دور واحد. أي تعديل على الدور ينطبق فوراً على كل مستخدميه.</p>
+    <div id="roleList" class="shift-list"></div>
+
+    <h3>سجل العمليات</h3>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead>
+        <tbody id="auditRows"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
 </div>
 </div>
@@ -224,8 +261,38 @@
     <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>سجل البصمات</button>
     <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>الورديات والأقسام</button>
     <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>الأجهزة</button>
+    <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>المستخدمين والصلاحيات</button>
+  <div class="sheet-sep"></div>
+  <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>تغيير كلمة المرور</button>
   <a class="nav-item" href="/logout"><svg class="icon"><use href="#i-logout"/></svg>تسجيل خروج</a>
 </div>
+
+<dialog id="userDialog" class="dialog">
+  <form method="dialog" class="form" id="userForm">
+    <h3 id="userDialogTitle">مستخدم جديد</h3>
+    <label>الاسم <input name="name" placeholder="مثلاً: محمد العتيبي"></label>
+    <label>اسم المستخدم <input name="username" dir="ltr" autocapitalize="none" placeholder="mohammed" required></label>
+    <label><span id="pwLabel">كلمة المرور</span> <input name="password" type="password" autocomplete="new-password" minlength="6"></label>
+    <label>الدور <select name="role_id" required></select></label>
+    <label class="check"><input type="checkbox" name="active" checked> الحساب نشط</label>
+    <div class="dialog-actions">
+      <button class="btn primary" value="save">حفظ</button>
+      <button class="btn" value="cancel" formnovalidate>إلغاء</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="passwordDialog" class="dialog">
+  <form method="dialog" class="form" id="passwordForm">
+    <h3>تغيير كلمة المرور</h3>
+    <label>كلمة المرور الحالية <input name="current" type="password" autocomplete="current-password" required></label>
+    <label>كلمة المرور الجديدة <input name="password" type="password" autocomplete="new-password" minlength="6" required></label>
+    <div class="dialog-actions">
+      <button class="btn primary" value="save">حفظ</button>
+      <button class="btn" value="cancel" formnovalidate>إلغاء</button>
+    </div>
+  </form>
+</dialog>
 
 <div class="toast" id="toast"></div>
 <script src="/static/app.js"></script>

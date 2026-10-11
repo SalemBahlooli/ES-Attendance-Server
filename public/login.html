@@ -15,13 +15,25 @@
 <body class="login-body">
   <form class="login-card" method="post" action="/login">
     <div class="brand"><span class="brand-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg></span>نظام الحضور</div>
-    <p class="muted">أدخل كلمة المرور للدخول إلى لوحة الحضور</p>
-    <div id="err" class="alert" hidden>كلمة المرور غير صحيحة</div>
-    <input type="password" name="password" placeholder="كلمة المرور" autofocus required>
+    <p class="muted">سجّل دخولك إلى لوحة الحضور</p>
+    <div id="err" class="alert" hidden></div>
+    <input name="username" placeholder="اسم المستخدم" autocomplete="username" autocapitalize="none" dir="ltr" autofocus required>
+    <input type="password" name="password" placeholder="كلمة المرور" autocomplete="current-password" required>
     <button type="submit" class="btn primary">دخول</button>
   </form>
   <script>
-    if (location.search.includes('error')) document.getElementById('err').hidden = false;
+    const err = new URLSearchParams(location.search).get('error');
+    const MESSAGES = {
+      '1': 'اسم المستخدم أو كلمة المرور غير صحيحة',
+      locked: 'محاولات كثيرة خاطئة. حاول مرة ثانية بعد 15 دقيقة',
+      changed: 'تم تغيير كلمة المرور، سجّل دخولك من جديد',
+    };
+    if (err && MESSAGES[err]) {
+      const box = document.getElementById('err');
+      box.textContent = MESSAGES[err];
+      box.hidden = false;
+      if (err === 'changed') box.className = 'alert ok';
+    }
   </script>
 </body>
 </html>

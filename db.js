@@ -99,6 +99,38 @@ async function init() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS leaves_dates_idx ON leaves (start_date, end_date);
+
+    -- Dashboard accounts. permissions holds keys from PERMISSIONS in auth.js.
+    CREATE TABLE IF NOT EXISTS roles (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      permissions TEXT[] NOT NULL DEFAULT '{}',
+      is_system BOOLEAN NOT NULL DEFAULT false
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      name TEXT,
+      password_hash TEXT NOT NULL,
+      role_id INT REFERENCES roles(id),
+      active BOOLEAN NOT NULL DEFAULT true,
+      token_version INT NOT NULL DEFAULT 0,
+      last_login TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_idx ON users (lower(username));
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id BIGSERIAL PRIMARY KEY,
+      user_id INT,
+      username TEXT,
+      action TEXT NOT NULL,
+      details TEXT,
+      ip TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS audit_log_time_idx ON audit_log (created_at DESC);
   `);
 
   // First run: create the default shift from WORK_START / WORK_END.

@@ -13,7 +13,13 @@ const STATUS = {
 };
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
-let meta = { today: '', leaveTypes: [], shifts: [], departments: [] };
+let meta = { today: '', leaveTypes: [], shifts: [], departments: [], me: { permissions: [] }, permissionList: [] };
+const can = (perm) => meta.me.permissions.includes(perm);
+const TAB_PERM = {
+  today: 'attendance.view', report: 'report.view', leaves: 'leaves.view', employees: 'employees.view',
+  log: 'punches.view', settings: 'settings.edit', devices: 'devices.view', users: 'users.manage',
+};
+const canTab = (tab) => can(TAB_PERM[tab]);
 let employees = [];
 let report = null;
 
@@ -64,7 +70,18 @@ async function loadMeta() {
   });
 }
 
+// Show only what the signed-in user is allowed to use
+function applyPermissions() {
+  document.querySelectorAll('[data-tab]').forEach((el) => (el.hidden = !canTab(el.dataset.tab)));
+  document.querySelectorAll('[data-perm]').forEach((el) => (el.hidden = !can(el.dataset.perm)));
+  $('meName').textContent = meta.me.name || meta.me.username;
+  $('meRole').textContent = `${meta.me.role || 'بدون دور'} · ${meta.me.username}`;
+  document.querySelectorAll('[data-action=password]').forEach((el) => (el.hidden = meta.me.builtin));
+  document.querySelector('.sheet-sep').hidden = !$('moreSheet').querySelector('[data-tab]:not([hidden])');
+}
+
 async function loadEmployeeList() {
+  if (!can('employees.view') && !can('leaves.edit') && !can('punches.view')) return;
   employees = await api('/api/employees');
   const active = employees.filter((e) => e.active);
   const label = (e) => `${e.pin} - ${e.name || 'بدون اسم'}`;
@@ -77,16 +94,21 @@ async function loadEmployeeList() {
 /* Tabs */
 const loaders = {
   today: loadToday, report: loadReport, leaves: loadLeaves, employees: loadEmployees,
-  log: loadLog, settings: loadSettings, devices: loadDevices,
+  log: loadLog, settings: loadSettings, devices: loadDevices, users: loadUsers,
 };
 const TITLES = {
   today: 'الحضور اليومي', report: 'تقرير الحضور', leaves: 'الإجازات والعطل', employees: 'الموظفين',
-  log: 'سجل البصمات', settings: 'الورديات والأقسام', devices: 'الأجهزة',
+  log: 'سجل البصمات', settings: 'الورديات والأقسام', devices: 'الأجهزة', users: 'المستخدمين والصلاحيات',
 };
 function showTab(name) {
-  if (!loaders[name]) name = 'today';
+  if (!loaders[name] || !canTab(name)) name = Object.keys(loaders).find(canTab);
+  if (!name) {
+    $('pageTitle').textContent = 'لا توجد صلاحيات';
+    document.querySelector('main').innerHTML = '<div class="card empty">حسابك ما عليه أي صلاحية. كلّم مدير النظام.</div>';
+    return;
+  }
   document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
-  $('moreBtn').classList.toggle('active', ['log', 'settings', 'devices'].includes(name));
+  $('moreBtn').classList.toggle('active', ['log', 'settings', 'devices', 'users'].includes(name));
   $('moreSheet').hidden = true;
   $('pageTitle').textContent = TITLES[name];
   document.querySelectorAll('main section').forEach((s) => (s.hidden = s.id !== 'tab-' + name));
@@ -123,7 +145,7 @@ async function loadToday() {
     <td class="num ${r.late_minutes ? 'warn' : ''}">${mins(r.late_minutes)}</td>
     <td class="num ${r.early_minutes ? 'warn' : ''}">${mins(r.early_minutes)}</td>
     <td>${pill(r.status)}${r.note ? ` <span class="muted small">${esc(r.note)}</span>` : ''}</td>
-    <td>${r.status === 'absent' ? `<button class="btn small" data-leave="${esc(r.pin)}" data-date="${r.date}">تسجيل إجازة</button>` : ''}</td>
+    <td>${r.status === 'absent' && can('leaves.edit') ? `<button class="btn small" data-leave="${esc(r.pin)}" data-date="${r.date}">تسجيل إجازة</button>` : ''}</td>
   </tr>`).join('') : '<tr><td colspan="11" class="empty">لا يوجد موظفين. أول ما يبصم أحد على الجهاز بيظهر هنا.</td></tr>';
 
   document.querySelectorAll('[data-leave]').forEach((b) => (b.onclick = () => {
@@ -211,14 +233,14 @@ async function loadLeaves() {
     <td class="num">${l.end_date}</td>
     <td class="num">${daysBetween(l.start_date, l.end_date)}</td>
     <td>${esc(l.note) || ''}</td>
-    <td><button class="btn small danger" data-del-leave="${l.id}">حذف</button></td>
+    <td>${can('leaves.edit') ? `<button class="btn small danger" data-del-leave="${l.id}">حذف</button>` : ''}</td>
   </tr>`).join('') : '<tr><td colspan="7" class="empty">لا توجد إجازات مسجلة</td></tr>';
   $('holidayRows').innerHTML = holidays.length ? holidays.map((x) => `<tr>
     <td>${esc(x.name)}</td>
     <td class="num">${x.start_date}</td>
     <td class="num">${x.end_date}</td>
     <td class="num">${daysBetween(x.start_date, x.end_date)}</td>
-    <td><button class="btn small danger" data-del-holiday="${x.id}">حذف</button></td>
+    <td>${can('holidays.edit') ? `<button class="btn small danger" data-del-holiday="${x.id}">حذف</button>` : ''}</td>
   </tr>`).join('') : '<tr><td colspan="5" class="empty">لا توجد عطل مسجلة</td></tr>';
 
   document.querySelectorAll('[data-del-leave]').forEach((b) => (b.onclick = async () => {
@@ -270,6 +292,7 @@ function renderEmployees() {
     <td class="num">${e.last_punch ? esc(e.last_punch.slice(0, 16)) : '—'}</td>
   </tr>`).join('') : '<tr><td colspan="7" class="empty">لا يوجد موظفين</td></tr>';
 
+  if (!can('employees.edit')) document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.disabled = true));
   document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.onchange = async () => {
     const pin = inp.closest('tr').dataset.pin;
     const field = inp.dataset.field;
@@ -423,7 +446,7 @@ async function loadDevices() {
         <span>إجمالي البصمات: <span class="num">${d.total}</span></span>
         ${d.pending ? `<span>أوامر بالانتظار: <span class="num">${d.pending}</span></span>` : ''}
       </div>
-      <div class="actions">
+      <div class="actions" ${can('devices.manage') ? '' : 'hidden'}>
         <button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">سحب أسماء الموظفين من الجهاز</button>
         <button class="btn small" data-sn="${esc(d.sn)}" data-act="resend-logs">إعادة سحب كل البصمات</button>
         <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">تسمية الجهاز</button>
@@ -445,6 +468,148 @@ async function loadDevices() {
   });
 }
 
+/* ---------------- Users & permissions ---------------- */
+let roles = [];
+let users = [];
+// "YYYY-MM-DD HH:MM" in the browser's local time
+const dateTime = (ts) => (ts ? new Date(ts).toLocaleString('sv-SE').slice(0, 16) : '—');
+
+async function loadUsers() {
+  [users, roles] = await Promise.all([api('/api/users'), api('/api/roles')]);
+  $('userRows').innerHTML = users.length ? users.map((u) => `<tr class="${u.active ? '' : 'inactive'}">
+    <td>${esc(u.name) || '—'}</td>
+    <td class="num">${esc(u.username)}</td>
+    <td>${esc(u.role) || '—'}</td>
+    <td>${u.active ? '<span class="pill ok">نشط</span>' : '<span class="pill absent">موقوف</span>'}</td>
+    <td class="num">${dateTime(u.last_login)}</td>
+    <td>
+      <button class="btn small" data-edit-user="${u.id}">تعديل</button>
+      ${u.id === meta.me.id ? '' : `<button class="btn small danger" data-del-user="${u.id}">حذف</button>`}
+    </td>
+  </tr>`).join('') : '<tr><td colspan="6" class="empty">ما فيه مستخدمين بعد. أضف أول مستخدم من زر "مستخدم جديد".</td></tr>';
+  document.querySelectorAll('[data-edit-user]').forEach((b) => (b.onclick = () => openUserDialog(users.find((u) => u.id === Number(b.dataset.editUser)))));
+  document.querySelectorAll('[data-del-user]').forEach((b) => (b.onclick = async () => {
+    const u = users.find((x) => x.id === Number(b.dataset.delUser));
+    if (!confirm(`حذف المستخدم ${u.name || u.username}؟`)) return;
+    await send('/api/users/' + u.id, 'DELETE');
+    toast('تم حذف المستخدم');
+    loadUsers();
+  }));
+
+  $('roleList').innerHTML = roles.map(roleCard).join('');
+  bindRoleForms();
+  loadAudit();
+}
+
+async function loadAudit() {
+  const rows = await api('/api/audit');
+  $('auditRows').innerHTML = rows.length ? rows.map((r) => `<tr>
+    <td class="num">${dateTime(r.created_at)}</td>
+    <td class="num">${esc(r.username) || '—'}</td>
+    <td>${esc(r.action)}</td>
+    <td class="wrap">${esc(r.details) || ''}</td>
+  </tr>`).join('') : '<tr><td colspan="4" class="empty">لا توجد عمليات بعد</td></tr>';
+}
+
+function roleCard(r) {
+  const groups = [...new Set(meta.permissionList.map((p) => p.group))];
+  return `<form class="card pad role" data-id="${r.id || ''}">
+    <div class="role-head">
+      <label>اسم الدور <input name="name" value="${esc(r.name)}" required></label>
+      <span class="muted small">${r.id ? `${r.users} مستخدم` : 'دور جديد'}</span>
+    </div>
+    ${r.is_system ? '<p class="muted small">هذا دور مدير النظام وله كل الصلاحيات دائماً.</p>' : ''}
+    <div class="perm-groups">
+      ${groups.map((g) => `<div class="perm-group"><div class="perm-title">${esc(g)}</div>
+        ${meta.permissionList.filter((p) => p.group === g).map((p) => `<label class="check">
+          <input type="checkbox" name="permissions" value="${p.key}" ${r.permissions.includes(p.key) ? 'checked' : ''} ${r.is_system ? 'disabled' : ''}>
+          ${esc(p.label)}</label>`).join('')}
+      </div>`).join('')}
+    </div>
+    <div class="actions">
+      <button class="btn primary small">حفظ</button>
+      ${!r.is_system ? `<button type="button" class="btn small" data-select-all>تحديد الكل</button>` : ''}
+      ${r.id && !r.is_system ? '<button type="button" class="btn small danger" data-delete>حذف</button>' : ''}
+    </div>
+  </form>`;
+}
+
+function bindRoleForms() {
+  document.querySelectorAll('form.role').forEach((form) => {
+    const id = form.dataset.id;
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const body = { name: fd.get('name'), permissions: fd.getAll('permissions') };
+      await send(id ? '/api/roles/' + id : '/api/roles', id ? 'PUT' : 'POST', body);
+      toast('تم حفظ الدور');
+      if (Number(id) && meta.me.builtin === false) { await loadMeta(); applyPermissions(); }
+      loadUsers();
+    };
+    const all = form.querySelector('[data-select-all]');
+    if (all) all.onclick = () => {
+      const boxes = form.querySelectorAll('input[name=permissions]');
+      const check = [...boxes].some((b) => !b.checked);
+      boxes.forEach((b) => (b.checked = check));
+    };
+    const del = form.querySelector('[data-delete]');
+    if (del) del.onclick = async () => {
+      if (!confirm('حذف الدور؟')) return;
+      await send('/api/roles/' + id, 'DELETE');
+      loadUsers();
+    };
+  });
+}
+
+$('addRole').onclick = () => {
+  if (document.querySelector('form.role[data-id=""]')) return;
+  $('roleList').insertAdjacentHTML('beforeend', roleCard({ name: '', permissions: [], users: 0 }));
+  bindRoleForms();
+  $('roleList').lastElementChild.querySelector('input').focus();
+};
+
+let editingUser = null;
+function openUserDialog(user) {
+  editingUser = user || null;
+  const f = $('userForm');
+  f.reset();
+  $('userDialogTitle').textContent = user ? 'تعديل مستخدم' : 'مستخدم جديد';
+  $('pwLabel').textContent = user ? 'كلمة مرور جديدة (اتركها فاضية إذا ما تبي تغيرها)' : 'كلمة المرور (6 أحرف على الأقل)';
+  f.role_id.innerHTML = options(roles, user ? user.role_id : (roles.find((r) => !r.is_system) || roles[0] || {}).id);
+  f.name.value = user ? user.name || '' : '';
+  f.username.value = user ? user.username : '';
+  f.username.disabled = !!user;
+  f.password.required = !user;
+  f.active.checked = user ? user.active : true;
+  f.active.disabled = !!user && user.id === meta.me.id;
+  $('userDialog').showModal();
+}
+$('addUser').onclick = () => openUserDialog();
+$('userForm').onsubmit = async (e) => {
+  if (e.submitter && e.submitter.value === 'cancel') return;
+  e.preventDefault();
+  const f = e.target;
+  const body = { name: f.name.value, role_id: Number(f.role_id.value), active: f.active.checked };
+  if (f.password.value) body.password = f.password.value;
+  if (editingUser) await send('/api/users/' + editingUser.id, 'PUT', body);
+  else await send('/api/users', 'POST', { ...body, username: f.username.value.trim() });
+  $('userDialog').close();
+  toast('تم حفظ المستخدم');
+  loadUsers();
+};
+
+document.querySelectorAll('[data-action=password]').forEach((b) => (b.onclick = () => {
+  $('moreSheet').hidden = true;
+  $('passwordForm').reset();
+  $('passwordDialog').showModal();
+}));
+$('passwordForm').onsubmit = async (e) => {
+  if (e.submitter && e.submitter.value === 'cancel') return;
+  e.preventDefault();
+  await send('/api/me/password', 'POST', formData(e.target));
+  location.href = '/login?error=changed';
+};
+
 /* ---------------- Init ---------------- */
 (async () => {
   await loadMeta();
@@ -457,7 +622,8 @@ async function loadDevices() {
   $('leaveType').innerHTML = meta.leaveTypes.map((t) => `<option>${esc(t)}</option>`).join('');
   $('topDate').textContent = new Date(today + 'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',
     { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  applyPermissions();
   showTab(location.hash.slice(1) || 'today');
   loadEmployeeList();
-  setInterval(() => { if (!$('tab-today').hidden) loadToday(); }, 30000);
+  setInterval(() => { if (can('attendance.view') && !$('tab-today').hidden) loadToday(); }, 30000);
 })();

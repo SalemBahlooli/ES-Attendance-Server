@@ -1,17 +1,17 @@
 const express = require('express');
-const crypto = require('crypto');
 const path = require('path');
 const { pool, init } = require('./db');
 const { compute, today, LEAVE_TYPES } = require('./attendance');
 const { buildWorkbook } = require('./export');
+const auth = require('./auth');
+const { requireAuth, need, audit } = auth;
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const DEVICE_TZ_OFFSET = process.env.DEVICE_TZ_OFFSET || '3'; // Saudi Arabia = +3
 
 if (!ADMIN_PASSWORD) {
-  console.warn('WARNING: ADMIN_PASSWORD is not set. The dashboard will refuse all logins until you set it.');
+  console.warn('WARNING: ADMIN_PASSWORD is not set. The built-in "admin" account is disabled until you set it.');
 }
 
 const app = express();
@@ -188,54 +188,18 @@ app.use('/iclock', iclock);
 /*  Login                                                              */
 /* ------------------------------------------------------------------ */
 
-function sign(value) {
-  return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('hex');
-}
-
-function makeToken() {
-  const exp = String(Date.now() + 30 * 24 * 3600 * 1000);
-  return `${exp}.${sign(exp)}`;
-}
-
-function validToken(token) {
-  if (!token) return false;
-  const [exp, sig] = token.split('.');
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const expected = sign(exp);
-  return sig.length === expected.length &&
-    crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
-}
-
-function getCookie(req, name) {
-  const header = req.headers.cookie || '';
-  for (const part of header.split(';')) {
-    const [k, ...v] = part.trim().split('=');
-    if (k === name) return decodeURIComponent(v.join('='));
-  }
-  return null;
-}
-
-function requireAuth(req, res, next) {
-  if (validToken(getCookie(req, 'sid'))) return next();
-  if (req.originalUrl.startsWith('/api/')) return res.status(401).json({ error: 'unauthorized' });
-  res.redirect('/login');
-}
-
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
-app.post('/login', (req, res) => {
-  const given = Buffer.from(String(req.body.password || ''));
-  const real = Buffer.from(ADMIN_PASSWORD);
-  const ok = ADMIN_PASSWORD && given.length === real.length && crypto.timingSafeEqual(given, real);
-  if (!ok) return res.redirect('/login?error=1');
-  res.set('Set-Cookie',
-    `sid=${encodeURIComponent(makeToken())}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 24 * 3600}` +
-    (req.secure ? '; Secure' : ''));
-  res.redirect('/');
+// Wrap async handlers so a DB error returns 500 instead of crashing the process
+const h = (fn) => (req, res) => fn(req, res).catch((e) => {
+  console.error('[API]', req.method, req.originalUrl, e.message);
+  if (!res.headersSent) res.status(500).json({ error: e.message });
 });
+
+app.post('/login', h(auth.login));
 
 app.get('/logout', (req, res) => {
   res.set('Set-Cookie', 'sid=; Path=/; Max-Age=0');
@@ -259,11 +223,10 @@ const isTime = (s) => /^\d{2}:\d{2}(:\d{2})?$/.test(s || '');
 const intOrNull = (v) => (v === '' || v == null ? null : parseInt(v, 10) || null);
 const text = (v) => String(v ?? '').trim() || null;
 
-// Wrap async handlers so a DB error returns 500 instead of crashing the process
-const h = (fn) => (req, res) => fn(req, res).catch((e) => {
-  console.error('[API]', req.method, req.originalUrl, e.message);
-  res.status(500).json({ error: e.message });
-});
+async function employeeLabel(pin) {
+  const { rows } = await pool.query('SELECT name FROM employees WHERE pin = $1', [pin]);
+  return rows[0] && rows[0].name ? `${rows[0].name} (${pin})` : `الموظف ${pin}`;
+}
 
 function rangeOk(from, to, maxDays = 366) {
   return isDate(from) && isDate(to) && from <= to &&
@@ -275,17 +238,20 @@ api.get('/meta', h(async (req, res) => {
     pool.query('SELECT * FROM shifts ORDER BY is_default DESC, id'),
     pool.query('SELECT * FROM departments ORDER BY name'),
   ]);
-  res.json({ today: today(), leaveTypes: LEAVE_TYPES, shifts: shifts.rows, departments: departments.rows });
+  res.json({
+    today: today(), leaveTypes: LEAVE_TYPES, shifts: shifts.rows, departments: departments.rows,
+    me: req.user, permissionList: auth.PERMISSIONS,
+  });
 }));
 
-api.get('/summary', h(async (req, res) => {
+api.get('/summary', need('attendance.view'), h(async (req, res) => {
   const date = req.query.date;
   if (!isDate(date)) return res.status(400).json({ error: 'bad date' });
   const { days } = await compute(date, date);
   res.json(days);
 }));
 
-api.get('/report', h(async (req, res) => {
+api.get('/report', need('report.view'), h(async (req, res) => {
   const { from, to } = req.query;
   if (!rangeOk(from, to)) return res.status(400).json({ error: 'bad range' });
   res.json(await compute(from, to));
@@ -299,16 +265,17 @@ function shiftBody(b) {
     Math.max(0, parseInt(b.grace_in, 10) || 0), Math.max(0, parseInt(b.grace_out, 10) || 0), weekend];
 }
 
-api.post('/shifts', h(async (req, res) => {
+api.post('/shifts', need('settings.edit'), h(async (req, res) => {
   const v = shiftBody(req.body);
   if (!v) return res.status(400).json({ error: 'بيانات الوردية ناقصة' });
   const { rows } = await pool.query(
     `INSERT INTO shifts (name, start_time, end_time, grace_in, grace_out, weekend)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, v);
+  await audit(req, 'إضافة وردية', `${v[0]} (${v[1]} - ${v[2]})`);
   res.json(rows[0]);
 }));
 
-api.put('/shifts/:id', h(async (req, res) => {
+api.put('/shifts/:id', need('settings.edit'), h(async (req, res) => {
   const v = shiftBody(req.body);
   if (!v) return res.status(400).json({ error: 'بيانات الوردية ناقصة' });
   await pool.query(
@@ -317,64 +284,71 @@ api.put('/shifts/:id', h(async (req, res) => {
   if (req.body.is_default) {
     await pool.query('UPDATE shifts SET is_default = (id = $1)', [req.params.id]);
   }
+  await audit(req, req.body.is_default ? 'تعيين الوردية الافتراضية' : 'تعديل وردية', `${v[0]} (${v[1]} - ${v[2]}، مهلة ${v[3]} د)`);
   res.json({ ok: true });
 }));
 
-api.delete('/shifts/:id', h(async (req, res) => {
-  const { rowCount } = await pool.query('DELETE FROM shifts WHERE id = $1 AND NOT is_default', [req.params.id]);
-  if (!rowCount) return res.status(400).json({ error: 'لا يمكن حذف الوردية الافتراضية' });
+api.delete('/shifts/:id', need('settings.edit'), h(async (req, res) => {
+  const { rows } = await pool.query('DELETE FROM shifts WHERE id = $1 AND NOT is_default RETURNING name', [req.params.id]);
+  if (!rows.length) return res.status(400).json({ error: 'لا يمكن حذف الوردية الافتراضية' });
+  await audit(req, 'حذف وردية', rows[0].name);
   res.json({ ok: true });
 }));
 
 /* Departments */
-api.post('/departments', h(async (req, res) => {
+api.post('/departments', need('settings.edit'), h(async (req, res) => {
   if (!text(req.body.name)) return res.status(400).json({ error: 'اكتب اسم القسم' });
   const { rows } = await pool.query(
     'INSERT INTO departments (name, shift_id) VALUES ($1, $2) RETURNING *',
     [text(req.body.name), intOrNull(req.body.shift_id)]);
+  await audit(req, 'إضافة قسم', rows[0].name);
   res.json(rows[0]);
 }));
 
-api.put('/departments/:id', h(async (req, res) => {
+api.put('/departments/:id', need('settings.edit'), h(async (req, res) => {
   if (!text(req.body.name)) return res.status(400).json({ error: 'اكتب اسم القسم' });
   await pool.query('UPDATE departments SET name = $2, shift_id = $3 WHERE id = $1',
     [req.params.id, text(req.body.name), intOrNull(req.body.shift_id)]);
+  await audit(req, 'تعديل قسم', text(req.body.name));
   res.json({ ok: true });
 }));
 
-api.delete('/departments/:id', h(async (req, res) => {
-  await pool.query('DELETE FROM departments WHERE id = $1', [req.params.id]);
+api.delete('/departments/:id', need('settings.edit'), h(async (req, res) => {
+  const { rows } = await pool.query('DELETE FROM departments WHERE id = $1 RETURNING name', [req.params.id]);
+  if (rows.length) await audit(req, 'حذف قسم', rows[0].name);
   res.json({ ok: true });
 }));
 
 /* Holidays */
-api.get('/holidays', h(async (req, res) => {
+api.get('/holidays', need('leaves.view'), h(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM holidays ORDER BY start_date DESC LIMIT 300');
   res.json(rows);
 }));
 
-api.post('/holidays', h(async (req, res) => {
+api.post('/holidays', need('holidays.edit'), h(async (req, res) => {
   const { name, start_date, end_date } = req.body;
   if (!text(name) || !rangeOk(start_date, end_date)) return res.status(400).json({ error: 'تحقق من الاسم والتواريخ' });
   await pool.query('INSERT INTO holidays (name, start_date, end_date) VALUES ($1, $2, $3)',
     [text(name), start_date, end_date]);
+  await audit(req, 'إضافة عطلة رسمية', `${text(name)} (${start_date} إلى ${end_date})`);
   res.json({ ok: true });
 }));
 
-api.delete('/holidays/:id', h(async (req, res) => {
-  await pool.query('DELETE FROM holidays WHERE id = $1', [req.params.id]);
+api.delete('/holidays/:id', need('holidays.edit'), h(async (req, res) => {
+  const { rows } = await pool.query('DELETE FROM holidays WHERE id = $1 RETURNING *', [req.params.id]);
+  if (rows.length) await audit(req, 'حذف عطلة رسمية', `${rows[0].name} (${rows[0].start_date} إلى ${rows[0].end_date})`);
   res.json({ ok: true });
 }));
 
 /* Leaves */
-api.get('/leaves', h(async (req, res) => {
+api.get('/leaves', need('leaves.view'), h(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT l.*, e.name FROM leaves l LEFT JOIN employees e ON e.pin = l.pin
      WHERE l.end_date >= CURRENT_DATE - 120 ORDER BY l.start_date DESC LIMIT 500`);
   res.json(rows);
 }));
 
-api.post('/leaves', h(async (req, res) => {
+api.post('/leaves', need('leaves.edit'), h(async (req, res) => {
   const { pin, type, start_date, end_date, note } = req.body;
   if (!text(pin) || !LEAVE_TYPES.includes(type) || !rangeOk(start_date, end_date)) {
     return res.status(400).json({ error: 'تحقق من الموظف والنوع والتواريخ' });
@@ -382,15 +356,20 @@ api.post('/leaves', h(async (req, res) => {
   await pool.query(
     'INSERT INTO leaves (pin, type, start_date, end_date, note) VALUES ($1, $2, $3, $4, $5)',
     [text(pin), type, start_date, end_date, text(note)]);
+  await audit(req, 'إضافة إجازة', `${await employeeLabel(pin)}: ${type} (${start_date} إلى ${end_date})`);
   res.json({ ok: true });
 }));
 
-api.delete('/leaves/:id', h(async (req, res) => {
-  await pool.query('DELETE FROM leaves WHERE id = $1', [req.params.id]);
+api.delete('/leaves/:id', need('leaves.edit'), h(async (req, res) => {
+  const { rows } = await pool.query('DELETE FROM leaves WHERE id = $1 RETURNING *', [req.params.id]);
+  if (rows.length) {
+    const l = rows[0];
+    await audit(req, 'حذف إجازة', `${await employeeLabel(l.pin)}: ${l.type} (${l.start_date} إلى ${l.end_date})`);
+  }
   res.json({ ok: true });
 }));
 
-api.get('/punches', h(async (req, res) => {
+api.get('/punches', need('punches.view'), h(async (req, res) => {
   const { from, to, pin } = req.query;
   if (!isDate(from) || !isDate(to)) return res.status(400).json({ error: 'bad date' });
   const params = [from, to];
@@ -407,7 +386,8 @@ api.get('/punches', h(async (req, res) => {
   res.json(rows);
 }));
 
-api.get('/employees', h(async (req, res) => {
+// Also needed for the employee pickers in the leave form and punch log
+api.get('/employees', need('employees.view', 'leaves.edit', 'punches.view'), h(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT e.pin, e.name, e.department_id, e.shift_id, e.active, e.start_date,
             MAX(a.punch_time) AS last_punch, COUNT(a.id)::int AS total
@@ -419,7 +399,7 @@ api.get('/employees', h(async (req, res) => {
 }));
 
 // Partial update: only the fields present in the body change
-api.put('/employees/:pin', h(async (req, res) => {
+api.put('/employees/:pin', need('employees.edit'), h(async (req, res) => {
   const b = req.body;
   const fields = {
     name: () => text(b.name),
@@ -436,10 +416,13 @@ api.put('/employees/:pin', h(async (req, res) => {
      ON CONFLICT (pin) DO UPDATE SET ${keys.map((k) => `${k} = EXCLUDED.${k}`).join(', ')}`,
     [req.params.pin, ...values]
   );
+  const LABELS = { name: 'الاسم', department_id: 'القسم', shift_id: 'الوردية', active: 'نشط', start_date: 'تاريخ المباشرة' };
+  await audit(req, 'تعديل موظف',
+    `${await employeeLabel(req.params.pin)}: ` + keys.map((k, i) => `${LABELS[k]} = ${values[i] ?? 'فارغ'}`).join('، '));
   res.json({ ok: true });
 }));
 
-api.get('/devices', h(async (req, res) => {
+api.get('/devices', need('devices.view'), h(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT d.*, (SELECT COUNT(*)::int FROM attendance a WHERE a.sn = d.sn) AS total,
             (SELECT COUNT(*)::int FROM commands c WHERE c.sn = d.sn AND c.status IN ('pending','sent')) AS pending
@@ -448,9 +431,10 @@ api.get('/devices', h(async (req, res) => {
   res.json(rows);
 }));
 
-api.put('/devices/:sn', h(async (req, res) => {
+api.put('/devices/:sn', need('devices.manage'), h(async (req, res) => {
   const name = String(req.body.name || '').trim() || null;
   await pool.query(`UPDATE devices SET name = $2 WHERE sn = $1`, [req.params.sn, name]);
+  await audit(req, 'تسمية جهاز', `${req.params.sn}: ${name || 'بدون اسم'}`);
   res.json({ ok: true });
 }));
 
@@ -461,16 +445,139 @@ const COMMANDS = {
   'check': 'CHECK',
 };
 
-api.post('/devices/:sn/:action', h(async (req, res) => {
+api.post('/devices/:sn/:action', need('devices.manage'), h(async (req, res) => {
   const command = COMMANDS[req.params.action];
   if (!command) return res.status(400).json({ error: 'unknown action' });
   await pool.query(`INSERT INTO commands (sn, command) VALUES ($1, $2)`, [req.params.sn, command]);
+  const NAMES = { 'sync-users': 'سحب أسماء الموظفين', 'resend-logs': 'إعادة سحب كل البصمات', check: 'فحص' };
+  await audit(req, 'أمر للجهاز', `${req.params.sn}: ${NAMES[req.params.action]}`);
   res.json({ ok: true });
+}));
+
+/* Users, roles and audit log */
+const USERNAME_RE = /^[a-zA-Z0-9._-]{3,32}$/;
+
+async function roleExists(id) {
+  const { rows } = await pool.query('SELECT 1 FROM roles WHERE id = $1', [id]);
+  return rows.length > 0;
+}
+
+api.post('/me/password', h(async (req, res) => {
+  if (req.user.builtin) return res.status(400).json({ error: 'كلمة مرور admin تتغير من متغير ADMIN_PASSWORD في Railway' });
+  const { current, password } = req.body;
+  const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (!rows.length || !auth.checkPassword(current, rows[0].password_hash)) {
+    return res.status(400).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+  }
+  if (String(password || '').length < 6) return res.status(400).json({ error: 'كلمة المرور لازم تكون 6 أحرف على الأقل' });
+  // Bumping token_version ends other sessions; give this one a fresh cookie
+  await pool.query('UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1',
+    [req.user.id, auth.hashPassword(password)]);
+  await audit(req, 'تغيير كلمة المرور الخاصة');
+  res.json({ ok: true, relogin: true });
+}));
+
+api.get('/users', need('users.manage'), h(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT u.id, u.username, u.name, u.role_id, r.name AS role, u.active, u.last_login, u.created_at
+     FROM users u LEFT JOIN roles r ON r.id = u.role_id ORDER BY u.id`);
+  res.json(rows);
+}));
+
+api.post('/users', need('users.manage'), h(async (req, res) => {
+  const { username, name, password, role_id } = req.body;
+  if (!USERNAME_RE.test(username || '')) {
+    return res.status(400).json({ error: 'اسم المستخدم من 3 إلى 32 حرف إنجليزي أو رقم بدون مسافات' });
+  }
+  if (username.toLowerCase() === auth.OWNER_USERNAME) return res.status(400).json({ error: 'اسم المستخدم admin محجوز' });
+  if (String(password || '').length < 6) return res.status(400).json({ error: 'كلمة المرور لازم تكون 6 أحرف على الأقل' });
+  if (!(await roleExists(role_id))) return res.status(400).json({ error: 'اختر الدور' });
+  const { rows: dup } = await pool.query('SELECT 1 FROM users WHERE lower(username) = lower($1)', [username]);
+  if (dup.length) return res.status(400).json({ error: 'اسم المستخدم مستخدم من قبل' });
+  await pool.query('INSERT INTO users (username, name, password_hash, role_id) VALUES ($1, $2, $3, $4)',
+    [username, text(name), auth.hashPassword(password), role_id]);
+  await audit(req, 'إضافة مستخدم', `${text(name) || username} (${username})`);
+  res.json({ ok: true });
+}));
+
+api.put('/users/:id', need('users.manage'), h(async (req, res) => {
+  const { name, role_id, active, password } = req.body;
+  if (!(await roleExists(role_id))) return res.status(400).json({ error: 'اختر الدور' });
+  if (Number(req.params.id) === req.user.id && active === false) {
+    return res.status(400).json({ error: 'ما تقدر توقف حسابك أنت' });
+  }
+  if (password && String(password).length < 6) return res.status(400).json({ error: 'كلمة المرور لازم تكون 6 أحرف على الأقل' });
+  const { rows } = await pool.query(
+    `UPDATE users SET name = $2, role_id = $3, active = $4 WHERE id = $1 RETURNING username`,
+    [req.params.id, text(name), role_id, active !== false]);
+  if (!rows.length) return res.status(404).json({ error: 'المستخدم غير موجود' });
+  if (password) {
+    await pool.query('UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1',
+      [req.params.id, auth.hashPassword(password)]);
+  }
+  await audit(req, 'تعديل مستخدم',
+    `${rows[0].username}${active === false ? ' (موقوف)' : ''}${password ? '، تغيير كلمة المرور' : ''}`);
+  res.json({ ok: true });
+}));
+
+api.delete('/users/:id', need('users.manage'), h(async (req, res) => {
+  if (Number(req.params.id) === req.user.id) return res.status(400).json({ error: 'ما تقدر تحذف حسابك أنت' });
+  const { rows } = await pool.query('DELETE FROM users WHERE id = $1 RETURNING username', [req.params.id]);
+  if (rows.length) await audit(req, 'حذف مستخدم', rows[0].username);
+  res.json({ ok: true });
+}));
+
+api.get('/roles', need('users.manage'), h(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT r.*, (SELECT COUNT(*)::int FROM users u WHERE u.role_id = r.id) AS users
+     FROM roles r ORDER BY r.is_system DESC, r.id`);
+  res.json(rows.map((r) => (r.is_system ? { ...r, permissions: auth.ALL } : r)));
+}));
+
+function roleBody(b) {
+  const permissions = (Array.isArray(b.permissions) ? b.permissions : []).filter((p) => auth.ALL.includes(p));
+  return text(b.name) ? [text(b.name), permissions] : null;
+}
+
+api.post('/roles', need('users.manage'), h(async (req, res) => {
+  const v = roleBody(req.body);
+  if (!v) return res.status(400).json({ error: 'اكتب اسم الدور' });
+  await pool.query('INSERT INTO roles (name, permissions) VALUES ($1, $2)', v);
+  await audit(req, 'إضافة دور', `${v[0]} (${v[1].length} صلاحية)`);
+  res.json({ ok: true });
+}));
+
+api.put('/roles/:id', need('users.manage'), h(async (req, res) => {
+  const v = roleBody(req.body);
+  if (!v) return res.status(400).json({ error: 'اكتب اسم الدور' });
+  // The system role always keeps every permission; only its name can change
+  await pool.query(
+    'UPDATE roles SET name = $2, permissions = CASE WHEN is_system THEN permissions ELSE $3 END WHERE id = $1',
+    [req.params.id, ...v]);
+  await audit(req, 'تعديل دور', `${v[0]} (${v[1].length} صلاحية)`);
+  res.json({ ok: true });
+}));
+
+api.delete('/roles/:id', need('users.manage'), h(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT name, is_system, (SELECT COUNT(*)::int FROM users WHERE role_id = $1) AS users FROM roles WHERE id = $1`,
+    [req.params.id]);
+  if (!rows.length) return res.json({ ok: true });
+  if (rows[0].is_system) return res.status(400).json({ error: 'ما يمكن حذف دور مدير النظام' });
+  if (rows[0].users) return res.status(400).json({ error: 'فيه مستخدمين على هذا الدور، غيّر دورهم أول' });
+  await pool.query('DELETE FROM roles WHERE id = $1', [req.params.id]);
+  await audit(req, 'حذف دور', rows[0].name);
+  res.json({ ok: true });
+}));
+
+api.get('/audit', need('users.manage'), h(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM audit_log ORDER BY id DESC LIMIT 300');
+  res.json(rows);
 }));
 
 app.use('/api', api);
 
-app.get('/export.xlsx', requireAuth, h(async (req, res) => {
+app.get('/export.xlsx', requireAuth, need('report.export'), h(async (req, res) => {
   const { from, to } = req.query;
   if (!rangeOk(from, to)) return res.status(400).send('bad date range');
   const wb = await buildWorkbook(from, to, intOrNull(req.query.department_id));
@@ -485,6 +592,7 @@ app.use('/static', express.static(path.join(__dirname, 'public')));
 /* ------------------------------------------------------------------ */
 
 init()
+  .then(auth.initAuth)
   .then(() => {
     app.listen(PORT, () => console.log(`Attendance server listening on port ${PORT}`));
   })
