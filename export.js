@@ -71,7 +71,7 @@ async function buildWorkbook(from, to, departmentId) {
   if (departmentId) { params.push(departmentId); where += ' AND e.department_id = $3'; }
   const { rows: punches } = await pool.query(
     `SELECT a.pin, e.name, to_char(a.punch_time, 'YYYY-MM-DD') AS day,
-            to_char(a.punch_time, 'HH24:MI:SS') AS time, COALESCE(d.name, a.sn) AS device
+            to_char(a.punch_time, 'HH24:MI:SS') AS time, CASE WHEN a.sn = 'MOBILE' THEN NULL ELSE COALESCE(d.name, a.sn) END AS device
      FROM attendance a
      LEFT JOIN employees e ON e.pin = a.pin
      LEFT JOIN devices d ON d.sn = a.sn

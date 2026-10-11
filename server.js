@@ -377,7 +377,10 @@ api.get('/punches', need('punches.view'), h(async (req, res) => {
   let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
   if (pin) { params.push(pin); where += ` AND a.pin = $${params.length}`; }
   const { rows } = await pool.query(
-    `SELECT a.id, a.pin, e.name, a.punch_time, a.verify, a.status, a.sn, d.name AS device_name
+    // Mobile punches are stored with sn 'MOBILE'; their source is never shown
+    `SELECT a.id, a.pin, e.name, a.punch_time,
+            CASE WHEN a.sn = 'MOBILE' THEN NULL ELSE a.verify END AS verify, a.status,
+            CASE WHEN a.sn = 'MOBILE' THEN NULL ELSE a.sn END AS sn, d.name AS device_name
      FROM attendance a
      LEFT JOIN employees e ON e.pin = a.pin
      LEFT JOIN devices d ON d.sn = a.sn
@@ -606,7 +609,10 @@ api.delete('/roles/:id', need('users.manage'), h(async (req, res) => {
 }));
 
 api.get('/audit', need('users.manage'), h(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM audit_log ORDER BY id DESC LIMIT 300');
+  // Mobile check-in entries are only visible to the built-in admin account
+  const { rows } = await pool.query(
+    `SELECT * FROM audit_log WHERE $1 OR action NOT LIKE 'Mobile check-%' ORDER BY id DESC LIMIT 300`,
+    [!!req.user.builtin]);
   res.json(rows);
 }));
 
