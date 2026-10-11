@@ -3,6 +3,8 @@ const { Pool, types } = require('pg');
 // Device times are local (no timezone). Keep them as plain text "YYYY-MM-DD HH:MM:SS"
 // so they are never shifted by the server's timezone.
 types.setTypeParser(1114, (v) => v);
+// DATE columns stay as "YYYY-MM-DD" too (pg would otherwise turn them into a Date at local midnight).
+types.setTypeParser(1082, (v) => v);
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -56,7 +58,55 @@ async function init() {
       sent_at TIMESTAMPTZ,
       done_at TIMESTAMPTZ
     );
+
+    -- Work schedules. weekend holds day numbers (0 = Sunday ... 6 = Saturday).
+    CREATE TABLE IF NOT EXISTS shifts (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      grace_in INT NOT NULL DEFAULT 15,
+      grace_out INT NOT NULL DEFAULT 0,
+      weekend INT[] NOT NULL DEFAULT '{5,6}',
+      is_default BOOLEAN NOT NULL DEFAULT false
+    );
+
+    CREATE TABLE IF NOT EXISTS departments (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      shift_id INT REFERENCES shifts(id) ON DELETE SET NULL
+    );
+
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id INT REFERENCES departments(id) ON DELETE SET NULL;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_id INT REFERENCES shifts(id) ON DELETE SET NULL;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;
+    ALTER TABLE employees ADD COLUMN IF NOT EXISTS start_date DATE;
+
+    CREATE TABLE IF NOT EXISTS holidays (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS leaves (
+      id SERIAL PRIMARY KEY,
+      pin TEXT NOT NULL REFERENCES employees(pin) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      note TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS leaves_dates_idx ON leaves (start_date, end_date);
   `);
+
+  // First run: create the default shift from WORK_START / WORK_END.
+  await pool.query(
+    `INSERT INTO shifts (name, start_time, end_time, is_default)
+     SELECT 'الدوام الرسمي', $1, $2, true WHERE NOT EXISTS (SELECT 1 FROM shifts)`,
+    [process.env.WORK_START || '08:00', process.env.WORK_END || '16:00']
+  );
 }
 
 module.exports = { pool, init };

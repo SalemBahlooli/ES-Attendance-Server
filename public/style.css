@@ -11,6 +11,8 @@
   --warn-soft: #faeeda;
   --danger: #a32d2d;
   --danger-soft: #fcebeb;
+  --info: #185fa5;
+  --info-soft: #e6f1fb;
   --radius: 10px;
 }
 @media (prefers-color-scheme: dark) {
@@ -27,6 +29,8 @@
     --warn-soft: #3b2a10;
     --danger: #f09595;
     --danger-soft: #3d1a1a;
+    --info: #85b7eb;
+    --info-soft: #102a44;
   }
 }
 * { box-sizing: border-box; }
@@ -120,3 +124,47 @@ tr:last-child td { border-bottom: none; }
   padding: 10px 18px; border-radius: var(--radius); font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
 }
 .toast.show { opacity: 1; }
+
+/* status colors */
+.warn { color: var(--warn); }
+.danger { color: var(--danger); }
+.info { color: var(--info); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.pill.off { background: var(--surface-2); color: var(--muted); }
+.btn.danger { color: var(--danger); }
+.small { font-size: 13px; }
+
+h3 { font-size: 16px; font-weight: 600; margin: 28px 0 10px; }
+.hint { margin: -6px 0 12px; font-size: 13px; }
+.top-gap { margin-top: 12px; }
+.pad { padding: 18px; }
+.pad h3 { margin-top: 0; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.form { display: grid; gap: 10px; }
+.form label, .shift-grid label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.form input, .form select { width: 100%; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+label.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--surface-2); }
+tr.inactive td { opacity: .5; }
+#empRows select, #empRows input[type=date], #deptRows select { padding: 5px 8px; }
+
+.shift-list { display: grid; gap: 12px; margin-bottom: 12px; }
+.shift { display: grid; gap: 14px; overflow: visible; }
+.shift-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.shift-grid input { width: 100%; }
+.weekdays { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+.shift .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+@media (max-width: 600px) {
+  header { padding: 12px 16px; }
+  main { padding: 16px 12px 60px; }
+  .stats { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; }
+  .stat { padding: 10px 12px; }
+  .stat .value { font-size: 22px; }
+  th, td { padding: 8px 10px; }
+  .toolbar > * { flex: 1 1 auto; }
+  .toolbar .spacer { display: none; }
+}

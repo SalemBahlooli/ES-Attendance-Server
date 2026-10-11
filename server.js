@@ -2,12 +2,13 @@ const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const { pool, init } = require('./db');
+const { compute, today, LEAVE_TYPES } = require('./attendance');
+const { buildWorkbook } = require('./export');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const DEVICE_TZ_OFFSET = process.env.DEVICE_TZ_OFFSET || '3'; // Saudi Arabia = +3
-const WORK_START = process.env.WORK_START || '08:00';
 
 if (!ADMIN_PASSWORD) {
   console.warn('WARNING: ADMIN_PASSWORD is not set. The dashboard will refuse all logins until you set it.');
@@ -254,28 +255,142 @@ api.use(requireAuth);
 
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
 
-api.get('/config', (req, res) => res.json({ workStart: WORK_START }));
+const isTime = (s) => /^\d{2}:\d{2}(:\d{2})?$/.test(s || '');
+const intOrNull = (v) => (v === '' || v == null ? null : parseInt(v, 10) || null);
+const text = (v) => String(v ?? '').trim() || null;
 
-api.get('/summary', async (req, res) => {
-  const date = req.query.date;
-  if (!isDate(date)) return res.status(400).json({ error: 'bad date' });
-  const { rows } = await pool.query(
-    `WITH day AS (
-       SELECT pin, MIN(punch_time) AS first_in, MAX(punch_time) AS last_out, COUNT(*)::int AS punches
-       FROM attendance WHERE punch_time >= $1::date AND punch_time < $1::date + 1
-       GROUP BY pin
-     )
-     SELECT p.pin, e.name, d.first_in, d.last_out, COALESCE(d.punches, 0) AS punches
-     FROM (SELECT pin FROM employees UNION SELECT pin FROM day) p
-     LEFT JOIN employees e ON e.pin = p.pin
-     LEFT JOIN day d ON d.pin = p.pin
-     ORDER BY d.first_in NULLS LAST, p.pin`,
-    [date]
-  );
-  res.json(rows);
+// Wrap async handlers so a DB error returns 500 instead of crashing the process
+const h = (fn) => (req, res) => fn(req, res).catch((e) => {
+  console.error('[API]', req.method, req.originalUrl, e.message);
+  res.status(500).json({ error: e.message });
 });
 
-api.get('/punches', async (req, res) => {
+function rangeOk(from, to, maxDays = 366) {
+  return isDate(from) && isDate(to) && from <= to &&
+    (Date.parse(to) - Date.parse(from)) / 86400000 <= maxDays;
+}
+
+api.get('/meta', h(async (req, res) => {
+  const [shifts, departments] = await Promise.all([
+    pool.query('SELECT * FROM shifts ORDER BY is_default DESC, id'),
+    pool.query('SELECT * FROM departments ORDER BY name'),
+  ]);
+  res.json({ today: today(), leaveTypes: LEAVE_TYPES, shifts: shifts.rows, departments: departments.rows });
+}));
+
+api.get('/summary', h(async (req, res) => {
+  const date = req.query.date;
+  if (!isDate(date)) return res.status(400).json({ error: 'bad date' });
+  const { days } = await compute(date, date);
+  res.json(days);
+}));
+
+api.get('/report', h(async (req, res) => {
+  const { from, to } = req.query;
+  if (!rangeOk(from, to)) return res.status(400).json({ error: 'bad range' });
+  res.json(await compute(from, to));
+}));
+
+/* Shifts */
+function shiftBody(b) {
+  if (!text(b.name) || !isTime(b.start_time) || !isTime(b.end_time)) return null;
+  const weekend = (Array.isArray(b.weekend) ? b.weekend : []).map(Number).filter((d) => d >= 0 && d <= 6);
+  return [text(b.name), b.start_time, b.end_time,
+    Math.max(0, parseInt(b.grace_in, 10) || 0), Math.max(0, parseInt(b.grace_out, 10) || 0), weekend];
+}
+
+api.post('/shifts', h(async (req, res) => {
+  const v = shiftBody(req.body);
+  if (!v) return res.status(400).json({ error: 'بيانات الوردية ناقصة' });
+  const { rows } = await pool.query(
+    `INSERT INTO shifts (name, start_time, end_time, grace_in, grace_out, weekend)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, v);
+  res.json(rows[0]);
+}));
+
+api.put('/shifts/:id', h(async (req, res) => {
+  const v = shiftBody(req.body);
+  if (!v) return res.status(400).json({ error: 'بيانات الوردية ناقصة' });
+  await pool.query(
+    `UPDATE shifts SET name = $2, start_time = $3, end_time = $4, grace_in = $5, grace_out = $6, weekend = $7
+     WHERE id = $1`, [req.params.id, ...v]);
+  if (req.body.is_default) {
+    await pool.query('UPDATE shifts SET is_default = (id = $1)', [req.params.id]);
+  }
+  res.json({ ok: true });
+}));
+
+api.delete('/shifts/:id', h(async (req, res) => {
+  const { rowCount } = await pool.query('DELETE FROM shifts WHERE id = $1 AND NOT is_default', [req.params.id]);
+  if (!rowCount) return res.status(400).json({ error: 'لا يمكن حذف الوردية الافتراضية' });
+  res.json({ ok: true });
+}));
+
+/* Departments */
+api.post('/departments', h(async (req, res) => {
+  if (!text(req.body.name)) return res.status(400).json({ error: 'اكتب اسم القسم' });
+  const { rows } = await pool.query(
+    'INSERT INTO departments (name, shift_id) VALUES ($1, $2) RETURNING *',
+    [text(req.body.name), intOrNull(req.body.shift_id)]);
+  res.json(rows[0]);
+}));
+
+api.put('/departments/:id', h(async (req, res) => {
+  if (!text(req.body.name)) return res.status(400).json({ error: 'اكتب اسم القسم' });
+  await pool.query('UPDATE departments SET name = $2, shift_id = $3 WHERE id = $1',
+    [req.params.id, text(req.body.name), intOrNull(req.body.shift_id)]);
+  res.json({ ok: true });
+}));
+
+api.delete('/departments/:id', h(async (req, res) => {
+  await pool.query('DELETE FROM departments WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+/* Holidays */
+api.get('/holidays', h(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM holidays ORDER BY start_date DESC LIMIT 300');
+  res.json(rows);
+}));
+
+api.post('/holidays', h(async (req, res) => {
+  const { name, start_date, end_date } = req.body;
+  if (!text(name) || !rangeOk(start_date, end_date)) return res.status(400).json({ error: 'تحقق من الاسم والتواريخ' });
+  await pool.query('INSERT INTO holidays (name, start_date, end_date) VALUES ($1, $2, $3)',
+    [text(name), start_date, end_date]);
+  res.json({ ok: true });
+}));
+
+api.delete('/holidays/:id', h(async (req, res) => {
+  await pool.query('DELETE FROM holidays WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+/* Leaves */
+api.get('/leaves', h(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT l.*, e.name FROM leaves l LEFT JOIN employees e ON e.pin = l.pin
+     WHERE l.end_date >= CURRENT_DATE - 120 ORDER BY l.start_date DESC LIMIT 500`);
+  res.json(rows);
+}));
+
+api.post('/leaves', h(async (req, res) => {
+  const { pin, type, start_date, end_date, note } = req.body;
+  if (!text(pin) || !LEAVE_TYPES.includes(type) || !rangeOk(start_date, end_date)) {
+    return res.status(400).json({ error: 'تحقق من الموظف والنوع والتواريخ' });
+  }
+  await pool.query(
+    'INSERT INTO leaves (pin, type, start_date, end_date, note) VALUES ($1, $2, $3, $4, $5)',
+    [text(pin), type, start_date, end_date, text(note)]);
+  res.json({ ok: true });
+}));
+
+api.delete('/leaves/:id', h(async (req, res) => {
+  await pool.query('DELETE FROM leaves WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+api.get('/punches', h(async (req, res) => {
   const { from, to, pin } = req.query;
   if (!isDate(from) || !isDate(to)) return res.status(400).json({ error: 'bad date' });
   const params = [from, to];
@@ -290,42 +405,54 @@ api.get('/punches', async (req, res) => {
     params
   );
   res.json(rows);
-});
+}));
 
-api.get('/employees', async (req, res) => {
+api.get('/employees', h(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT e.pin, e.name, MAX(a.punch_time) AS last_punch, COUNT(a.id)::int AS total
+    `SELECT e.pin, e.name, e.department_id, e.shift_id, e.active, e.start_date,
+            MAX(a.punch_time) AS last_punch, COUNT(a.id)::int AS total
      FROM employees e LEFT JOIN attendance a ON a.pin = e.pin
-     GROUP BY e.pin, e.name
+     GROUP BY e.pin
      ORDER BY CASE WHEN e.pin ~ '^[0-9]+$' THEN e.pin::bigint END NULLS LAST, e.pin`
   );
   res.json(rows);
-});
+}));
 
-api.put('/employees/:pin', async (req, res) => {
-  const name = String(req.body.name || '').trim() || null;
+// Partial update: only the fields present in the body change
+api.put('/employees/:pin', h(async (req, res) => {
+  const b = req.body;
+  const fields = {
+    name: () => text(b.name),
+    department_id: () => intOrNull(b.department_id),
+    shift_id: () => intOrNull(b.shift_id),
+    active: () => b.active !== false,
+    start_date: () => (isDate(b.start_date) ? b.start_date : null),
+  };
+  const keys = Object.keys(fields).filter((k) => k in b);
+  if (!keys.length) return res.status(400).json({ error: 'nothing to update' });
+  const values = keys.map((k) => fields[k]());
   await pool.query(
-    `INSERT INTO employees (pin, name) VALUES ($1, $2)
-     ON CONFLICT (pin) DO UPDATE SET name = EXCLUDED.name`,
-    [req.params.pin, name]
+    `INSERT INTO employees (pin, ${keys.join(', ')}) VALUES ($1, ${keys.map((_, i) => '$' + (i + 2)).join(', ')})
+     ON CONFLICT (pin) DO UPDATE SET ${keys.map((k) => `${k} = EXCLUDED.${k}`).join(', ')}`,
+    [req.params.pin, ...values]
   );
   res.json({ ok: true });
-});
+}));
 
-api.get('/devices', async (req, res) => {
+api.get('/devices', h(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT d.*, (SELECT COUNT(*)::int FROM attendance a WHERE a.sn = d.sn) AS total,
             (SELECT COUNT(*)::int FROM commands c WHERE c.sn = d.sn AND c.status IN ('pending','sent')) AS pending
      FROM devices d ORDER BY last_seen DESC`
   );
   res.json(rows);
-});
+}));
 
-api.put('/devices/:sn', async (req, res) => {
+api.put('/devices/:sn', h(async (req, res) => {
   const name = String(req.body.name || '').trim() || null;
   await pool.query(`UPDATE devices SET name = $2 WHERE sn = $1`, [req.params.sn, name]);
   res.json({ ok: true });
-});
+}));
 
 // Queue commands for the device; it picks them up on its next /iclock/getrequest
 const COMMANDS = {
@@ -334,35 +461,24 @@ const COMMANDS = {
   'check': 'CHECK',
 };
 
-api.post('/devices/:sn/:action', async (req, res) => {
+api.post('/devices/:sn/:action', h(async (req, res) => {
   const command = COMMANDS[req.params.action];
   if (!command) return res.status(400).json({ error: 'unknown action' });
   await pool.query(`INSERT INTO commands (sn, command) VALUES ($1, $2)`, [req.params.sn, command]);
   res.json({ ok: true });
-});
+}));
 
 app.use('/api', api);
 
-app.get('/export.csv', requireAuth, async (req, res) => {
+app.get('/export.xlsx', requireAuth, h(async (req, res) => {
   const { from, to } = req.query;
-  if (!isDate(from) || !isDate(to)) return res.status(400).send('bad date');
-  const { rows } = await pool.query(
-    `SELECT a.pin, e.name, to_char(a.punch_time, 'YYYY-MM-DD') AS day,
-            to_char(a.punch_time, 'HH24:MI:SS') AS time, COALESCE(d.name, a.sn) AS device
-     FROM attendance a
-     LEFT JOIN employees e ON e.pin = a.pin
-     LEFT JOIN devices d ON d.sn = a.sn
-     WHERE a.punch_time >= $1::date AND a.punch_time < $2::date + 1
-     ORDER BY a.punch_time`,
-    [from, to]
-  );
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['رقم الموظف', 'الاسم', 'التاريخ', 'الوقت', 'الجهاز'].map(esc).join(',')];
-  for (const r of rows) lines.push([r.pin, r.name, r.day, r.time, r.device].map(esc).join(','));
-  res.set('Content-Type', 'text/csv; charset=utf-8');
-  res.set('Content-Disposition', `attachment; filename="attendance_${from}_${to}.csv"`);
-  res.send('﻿' + lines.join('\r\n'));
-});
+  if (!rangeOk(from, to)) return res.status(400).send('bad date range');
+  const wb = await buildWorkbook(from, to, intOrNull(req.query.department_id));
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.set('Content-Disposition', `attachment; filename="attendance_${from}_${to}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
+}));
 
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
