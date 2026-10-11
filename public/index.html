@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظام الحضور</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="brand-mark"></span>نظام الحضور</div>
+  <a href="/logout">تسجيل خروج</a>
+</header>
+
+<nav class="tabs">
+  <button data-tab="today" class="active">الحضور اليومي</button>
+  <button data-tab="log">سجل البصمات</button>
+  <button data-tab="employees">الموظفين</button>
+  <button data-tab="devices">الأجهزة</button>
+</nav>
+
+<main>
+  <!-- Daily attendance -->
+  <section id="tab-today">
+    <div class="toolbar">
+      <input type="date" id="day">
+      <button class="btn" id="prevDay">اليوم السابق</button>
+      <button class="btn" id="todayBtn">اليوم</button>
+      <span class="spacer"></span>
+      <span class="muted">بداية الدوام: <span id="workStart" class="num"></span></span>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="label">حاضر</div><div class="value num" id="sPresent">0</div></div>
+      <div class="stat"><div class="label">متأخر</div><div class="value num" id="sLate">0</div></div>
+      <div class="stat"><div class="label">غائب</div><div class="value num" id="sAbsent">0</div></div>
+      <div class="stat"><div class="label">إجمالي الموظفين</div><div class="value num" id="sTotal">0</div></div>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>الرقم</th><th>الاسم</th><th>أول بصمة</th><th>آخر بصمة</th><th>المدة</th><th>عدد البصمات</th><th>الحالة</th></tr></thead>
+        <tbody id="todayRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Punch log -->
+  <section id="tab-log" hidden>
+    <div class="toolbar">
+      <label>من <input type="date" id="from"></label>
+      <label>إلى <input type="date" id="to"></label>
+      <select id="pinFilter"><option value="">كل الموظفين</option></select>
+      <button class="btn" id="loadLog">عرض</button>
+      <span class="spacer"></span>
+      <button class="btn primary" id="exportBtn">تصدير Excel</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>الرقم</th><th>الاسم</th><th>التاريخ</th><th>الوقت</th><th>طريقة التحقق</th><th>الجهاز</th></tr></thead>
+        <tbody id="logRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Employees -->
+  <section id="tab-employees" hidden>
+    <div class="toolbar">
+      <span class="muted">اكتب اسم الموظف بجانب رقمه، ويُحفظ تلقائياً عند الخروج من الحقل.</span>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>الرقم</th><th>الاسم</th><th>آخر بصمة</th><th>إجمالي البصمات</th></tr></thead>
+        <tbody id="empRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Devices -->
+  <section id="tab-devices" hidden>
+    <div class="device-grid" id="deviceList"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const VERIFY = { 0: 'كلمة مرور', 1: 'بصمة إصبع', 2: 'بطاقة', 3: 'كلمة مرور', 4: 'بطاقة', 15: 'الوجه', 25: 'راحة اليد' };
+let workStart = '08:00';
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+async function api(url, opts = {}) {
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (res.status === 401) { location.href = '/login'; throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function localDate(d = new Date()) {
+  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return z.toISOString().slice(0, 10);
+}
+const hm = (ts) => ts ? ts.slice(11, 16) : '—';
+function duration(a, b) {
+  if (!a || !b || a === b) return '—';
+  const mins = Math.round((new Date(b.replace(' ', 'T')) - new Date(a.replace(' ', 'T'))) / 60000);
+  return `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`;
+}
+
+/* Tabs */
+document.querySelectorAll('nav.tabs button').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x === b));
+    document.querySelectorAll('main section').forEach((s) => (s.hidden = s.id !== 'tab-' + b.dataset.tab));
+    ({ today: loadToday, log: loadLog, employees: loadEmployees, devices: loadDevices })[b.dataset.tab]();
+  };
+});
+
+/* Daily */
+async function loadToday() {
+  const rows = await api('/api/summary?date=' + $('day').value);
+  let present = 0, late = 0, absent = 0;
+  $('todayRows').innerHTML = rows.length ? rows.map((r) => {
+    let status;
+    if (!r.first_in) { absent++; status = '<span class="pill absent">غائب</span>'; }
+    else if (hm(r.first_in) > workStart) { present++; late++; status = '<span class="pill late">متأخر</span>'; }
+    else { present++; status = '<span class="pill ok">حاضر</span>'; }
+    return `<tr>
+      <td class="num">${esc(r.pin)}</td>
+      <td>${esc(r.name) || '<span class="muted">بدون اسم</span>'}</td>
+      <td class="num">${hm(r.first_in)}</td>
+      <td class="num">${r.punches > 1 ? hm(r.last_out) : '—'}</td>
+      <td class="num">${duration(r.first_in, r.last_out)}</td>
+      <td class="num">${r.punches}</td>
+      <td>${status}</td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">لا يوجد موظفين بعد. أول ما يبصم أحد على الجهاز بيظهر هنا.</td></tr>';
+  $('sPresent').textContent = present;
+  $('sLate').textContent = late;
+  $('sAbsent').textContent = absent;
+  $('sTotal').textContent = rows.length;
+}
+$('day').onchange = loadToday;
+$('todayBtn').onclick = () => { $('day').value = localDate(); loadToday(); };
+$('prevDay').onclick = () => {
+  const d = new Date($('day').value + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  $('day').value = localDate(d);
+  loadToday();
+};
+
+/* Log */
+async function loadLog() {
+  const pin = $('pinFilter').value;
+  const rows = await api(`/api/punches?from=${$('from').value}&to=${$('to').value}${pin ? '&pin=' + encodeURIComponent(pin) : ''}`);
+  $('logRows').innerHTML = rows.length ? rows.map((r) => `<tr>
+    <td class="num">${esc(r.pin)}</td>
+    <td>${esc(r.name) || '<span class="muted">بدون اسم</span>'}</td>
+    <td class="num">${r.punch_time.slice(0, 10)}</td>
+    <td class="num">${r.punch_time.slice(11, 19)}</td>
+    <td>${VERIFY[r.verify] || r.verify}</td>
+    <td>${esc(r.device_name || r.sn)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="empty">لا توجد بصمات في هذه الفترة</td></tr>';
+}
+$('loadLog').onclick = loadLog;
+$('exportBtn').onclick = () => { location.href = `/export.csv?from=${$('from').value}&to=${$('to').value}`; };
+
+/* Employees */
+async function loadEmployees() {
+  const rows = await api('/api/employees');
+  $('pinFilter').innerHTML = '<option value="">كل الموظفين</option>' +
+    rows.map((r) => `<option value="${esc(r.pin)}">${esc(r.pin)} - ${esc(r.name || 'بدون اسم')}</option>`).join('');
+  $('empRows').innerHTML = rows.length ? rows.map((r) => `<tr>
+    <td class="num">${esc(r.pin)}</td>
+    <td><input class="name-input" data-pin="${esc(r.pin)}" value="${esc(r.name)}" placeholder="اكتب الاسم"></td>
+    <td class="num">${r.last_punch ? esc(r.last_punch.slice(0, 16)) : '—'}</td>
+    <td class="num">${r.total}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">لا يوجد موظفين بعد</td></tr>';
+  document.querySelectorAll('.name-input').forEach((inp) => {
+    inp.dataset.orig = inp.value;
+    inp.onchange = async () => {
+      await api('/api/employees/' + encodeURIComponent(inp.dataset.pin), { method: 'PUT', body: JSON.stringify({ name: inp.value }) });
+      toast('تم حفظ الاسم');
+    };
+  });
+}
+
+/* Devices */
+async function loadDevices() {
+  const rows = await api('/api/devices');
+  $('deviceList').innerHTML = rows.length ? rows.map((d) => {
+    const online = Date.now() - new Date(d.last_seen).getTime() < 3 * 60 * 1000;
+    return `<div class="card device">
+      <div><span class="dot ${online ? 'on' : 'off'}"></span><strong>${esc(d.name || 'جهاز البصمة')}</strong>
+        <span class="muted"> · ${online ? 'متصل' : 'غير متصل'}</span></div>
+      <div class="row">
+        <span>الرقم التسلسلي: <span class="num">${esc(d.sn)}</span></span>
+        <span>آخر اتصال: <span class="num">${new Date(d.last_seen).toLocaleString('ar-SA-u-nu-latn')}</span></span>
+        <span>إجمالي البصمات: <span class="num">${d.total}</span></span>
+        ${d.pending ? `<span>أوامر بالانتظار: <span class="num">${d.pending}</span></span>` : ''}
+      </div>
+      <div class="actions">
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">سحب أسماء الموظفين من الجهاز</button>
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="resend-logs">إعادة سحب كل البصمات</button>
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">تسمية الجهاز</button>
+      </div></div>`;
+  }).join('') : '<div class="card empty">لم يتصل أي جهاز بعد. اضبط إعدادات Cloud Server في الجهاز، وبيظهر هنا خلال دقيقة.</div>';
+  document.querySelectorAll('[data-act]').forEach((b) => {
+    b.onclick = async () => {
+      const sn = b.dataset.sn;
+      if (b.dataset.act === 'rename') {
+        const name = prompt('اسم الجهاز (مثلاً: المدخل الرئيسي)');
+        if (name === null) return;
+        await api('/api/devices/' + encodeURIComponent(sn), { method: 'PUT', body: JSON.stringify({ name }) });
+        return loadDevices();
+      }
+      await api(`/api/devices/${encodeURIComponent(sn)}/${b.dataset.act}`, { method: 'POST' });
+      toast('تم إرسال الأمر، الجهاز بينفذه خلال ثواني');
+      loadDevices();
+    };
+  });
+}
+
+/* Init */
+(async () => {
+  const today = localDate();
+  $('day').value = today;
+  $('to').value = today;
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  $('from').value = localDate(weekAgo);
+  try { workStart = (await api('/api/config')).workStart; } catch (_) {}
+  $('workStart').textContent = workStart;
+  loadToday();
+  loadEmployees();
+  setInterval(() => { if (!$('tab-today').hidden) loadToday(); }, 30000);
+})();
+</script>
+</body>
+</html>
