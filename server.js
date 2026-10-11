@@ -357,7 +357,7 @@ app.get('/export.csv', requireAuth, async (req, res) => {
     [from, to]
   );
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['رقم الموظف', 'الاسم', 'التاريخ', 'الوقت', 'الجهاز'].map(esc).join(',')];
+  const lines = [['Employee ID', 'Name', 'Date', 'Time', 'Device'].map(esc).join(',')];
   for (const r of rows) lines.push([r.pin, r.name, r.day, r.time, r.device].map(esc).join(','));
   res.set('Content-Type', 'text/csv; charset=utf-8');
   res.set('Content-Disposition', `attachment; filename="attendance_${from}_${to}.csv"`);
