@@ -79,12 +79,24 @@ const loaders = {
   today: loadToday, report: loadReport, leaves: loadLeaves, employees: loadEmployees,
   log: loadLog, settings: loadSettings, devices: loadDevices,
 };
+const TITLES = {
+  today: 'الحضور اليومي', report: 'تقرير الحضور', leaves: 'الإجازات والعطل', employees: 'الموظفين',
+  log: 'سجل البصمات', settings: 'الورديات والأقسام', devices: 'الأجهزة',
+};
 function showTab(name) {
-  document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
+  if (!loaders[name]) name = 'today';
+  document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
+  $('moreBtn').classList.toggle('active', ['log', 'settings', 'devices'].includes(name));
+  $('moreSheet').hidden = true;
+  $('pageTitle').textContent = TITLES[name];
   document.querySelectorAll('main section').forEach((s) => (s.hidden = s.id !== 'tab-' + name));
+  history.replaceState(null, '', '#' + name);
+  window.scrollTo(0, 0);
   loaders[name]();
 }
-document.querySelectorAll('nav.tabs button').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+$('moreBtn').onclick = (e) => { e.stopPropagation(); $('moreSheet').hidden = !$('moreSheet').hidden; };
+document.addEventListener('click', (e) => { if (!$('moreSheet').contains(e.target)) $('moreSheet').hidden = true; });
 
 /* ---------------- Daily ---------------- */
 async function loadToday() {
@@ -443,7 +455,9 @@ async function loadDevices() {
   $('repMonth').value = today.slice(0, 7);
   setMonth(today.slice(0, 7));
   $('leaveType').innerHTML = meta.leaveTypes.map((t) => `<option>${esc(t)}</option>`).join('');
-  loadToday();
+  $('topDate').textContent = new Date(today + 'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',
+    { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  showTab(location.hash.slice(1) || 'today');
   loadEmployeeList();
   setInterval(() => { if (!$('tab-today').hidden) loadToday(); }, 30000);
 })();
