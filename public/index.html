@@ -134,7 +134,7 @@
         <h3>Add public holiday</h3>
         <p class="muted small">A public holiday applies to every employee (e.g. Eid or National Day).</p>
         <form id="holidayForm" class="form">
-          <label>Name <input name="name" placeholder="e.g. Eid Al-Adha" required></label>
+          <label>Name <input name="name" required></label>
           <div class="row-2">
             <label>From <input type="date" name="start_date" required></label>
             <label>To <input type="date" name="end_date" required></label>
@@ -271,8 +271,8 @@
 <dialog id="userDialog" class="dialog">
   <form method="dialog" class="form" id="userForm">
     <h3 id="userDialogTitle">New user</h3>
-    <label>Full name <input name="name" placeholder="e.g. Mohammed Alotaibi"></label>
-    <label>Username <input name="username" autocapitalize="none" placeholder="mohammed" required></label>
+    <label>Full name <input name="name"></label>
+    <label>Username <input name="username" autocapitalize="none" required></label>
     <label><span id="pwLabel">Password</span> <input name="password" type="password" autocomplete="new-password" minlength="6"></label>
     <label>Role <select name="role_id" required></select></label>
     <label class="check"><input type="checkbox" name="active" checked> Account active</label>

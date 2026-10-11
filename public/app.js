@@ -468,7 +468,7 @@ async function loadDevices() {
     b.onclick = async () => {
       const sn = b.dataset.sn;
       if (b.dataset.act === 'rename') {
-        const name = prompt('Device name (e.g. Main entrance)');
+        const name = prompt('Device name');
         if (name === null) return;
         await send('/api/devices/' + encodeURIComponent(sn), 'PUT', { name });
         return loadDevices();
