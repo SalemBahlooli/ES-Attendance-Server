@@ -1,37 +1,37 @@
 # ES Attendance Server
 
-سيرفر حضور وانصراف يستقبل البصمات مباشرة من جهاز **ZKTeco uFace 800** عبر خاصية Cloud Server (ADMS)، ويحفظها في PostgreSQL، ويعرضها في لوحة ويب بالعربي.
+An attendance server that receives punches directly from a **ZKTeco uFace 800** device via its Cloud Server (ADMS) feature, stores them in PostgreSQL, and shows them in a web dashboard.
 
-## التشغيل على Railway
+## Deploying on Railway
 
-1. في المشروع على Railway: **New ← GitHub Repository** واختر هذا المستودع.
-2. إذا ما عندك قاعدة بيانات: **New ← Database ← PostgreSQL**.
-3. في خدمة السيرفر ← **Variables** أضف:
+1. In your Railway project: **New → GitHub Repository** and pick this repository.
+2. If you don't have a database yet: **New → Database → PostgreSQL**.
+3. In the server service → **Variables**, add:
 
-   | المتغير | القيمة |
+   | Variable | Value |
    |---|---|
    | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
-   | `ADMIN_PASSWORD` | كلمة مرور اللوحة |
-   | `SESSION_SECRET` | نص عشوائي طويل |
-   | `WORK_START` | بداية الدوام، مثلاً `08:00` (اختياري) |
+   | `ADMIN_PASSWORD` | Dashboard password |
+   | `SESSION_SECRET` | A long random string |
+   | `WORK_START` | Work start time, e.g. `08:00` (optional) |
 
-4. **Settings ← Networking**:
-   - **Generate Domain**: هذا رابط اللوحة اللي تفتحه من المتصفح.
-   - **TCP Proxy** على المنفذ `8080` (أو قيمة `PORT`): هذا العنوان اللي تكتبه في الجهاز.
+4. **Settings → Networking**:
+   - **Generate Domain**: the dashboard URL you open in the browser.
+   - **TCP Proxy** on port `8080` (or the value of `PORT`): the address you enter on the device.
 
-## إعداد الجهاز
+## Device setup
 
-**Menu ← COMM ← Cloud Server Setting**
+**Menu → COMM → Cloud Server Setting**
 
 - Enable Domain Name: **ON**
-- Server Address: عنوان الـ TCP Proxy بدون المنفذ (مثل `xxx.proxy.rlwy.net`)
-- Server Port: منفذ الـ TCP Proxy (مثل `12345`)
+- Server Address: the TCP Proxy address without the port (e.g. `xxx.proxy.rlwy.net`)
+- Server Port: the TCP Proxy port (e.g. `12345`)
 - HTTPS: **OFF**
 - Proxy Server: **OFF**
 
-بعد الحفظ أعد تشغيل الجهاز. خلال دقيقة يظهر في تبويب **الأجهزة** في اللوحة.
+Save and restart the device. Within a minute it shows up in the **Devices** tab of the dashboard.
 
-## ملاحظات
+## Notes
 
-- أسماء الموظفين: اضغط "سحب أسماء الموظفين من الجهاز" في تبويب الأجهزة، أو اكتبها يدوياً في تبويب الموظفين.
-- البصمات القديمة المخزنة في الجهاز: اضغط "إعادة سحب كل البصمات". البصمات المكررة تُتجاهل تلقائياً.
+- Employee names: click "Pull employee names from device" in the Devices tab, or type them manually in the Employees tab.
+- Old punches stored on the device: click "Re-pull all punches". Duplicate punches are ignored automatically.
