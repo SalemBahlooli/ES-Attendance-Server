@@ -1,0 +1,33 @@
+# Local run: docker compose up -d   then open http://localhost:8080
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: attendance
+      POSTGRES_DB: attendance
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance -d attendance"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://attendance:attendance@db:5432/attendance
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-to-a-long-random-string}
+      PORT: 8080
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
