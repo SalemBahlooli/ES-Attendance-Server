@@ -213,21 +213,6 @@ td.wrap { white-space: normal; min-width: 220px; }
 .dialog input:disabled { opacity: .6; }
 .dialog-actions { display: flex; gap: 8px; margin-top: 6px; }
 
-/* mobile check-in */
-.checkin { max-width: 420px; margin: 0 auto; display: grid; justify-items: center; gap: 10px; text-align: center; overflow: visible; }
-.checkin-emp { display: grid; gap: 4px; width: 100%; font-size: 13px; color: var(--muted); text-align: start; }
-.checkin-emp select { width: 100%; }
-.checkin-clock { font-size: 56px; font-weight: 600; line-height: 1.1; margin-top: 10px; }
-.checkin-btn {
-  width: 180px; height: 180px; border-radius: 50%; margin: 18px 0 6px; border: 0; cursor: pointer;
-  background: var(--accent); color: var(--bg); font: inherit; font-size: 22px; font-weight: 600;
-  box-shadow: 0 0 0 10px var(--accent-soft);
-}
-.checkin-btn.out { background: var(--warn); box-shadow: 0 0 0 10px var(--warn-soft); }
-.checkin-btn:disabled { opacity: .45; cursor: default; }
-.checkin-list { width: 100%; display: grid; gap: 6px; margin-top: 8px; }
-.checkin-row { display: flex; justify-content: space-between; padding: 8px 12px; border-radius: var(--radius); background: var(--surface-2); }
-
 @media (max-width: 800px) {
   .sidebar { display: none; }
   .topbar { padding: 10px 16px; }

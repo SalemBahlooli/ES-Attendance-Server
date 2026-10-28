@@ -18,8 +18,7 @@ const TAB_PERM = {
   today: 'attendance.view', report: 'report.view', leaves: 'leaves.view', employees: 'employees.view',
   log: 'punches.view', settings: 'settings.edit', devices: 'devices.view', users: 'users.manage',
 };
-// Mobile check-in is only for the built-in admin account for now
-const canTab = (tab) => (tab === 'checkin' ? !!meta.me.builtin : can(TAB_PERM[tab]));
+const canTab = (tab) => can(TAB_PERM[tab]);
 let employees = [];
 let report = null;
 
@@ -95,11 +94,11 @@ async function loadEmployeeList() {
 
 /* Tabs */
 const loaders = {
-  checkin: loadCheckin, today: loadToday, report: loadReport, leaves: loadLeaves, employees: loadEmployees,
+  today: loadToday, report: loadReport, leaves: loadLeaves, employees: loadEmployees,
   log: loadLog, settings: loadSettings, devices: loadDevices, users: loadUsers,
 };
 const TITLES = {
-  checkin: 'Mobile check-in', today: 'Daily attendance', report: 'Attendance report', leaves: 'Leaves & holidays', employees: 'Employees',
+  today: 'Daily attendance', report: 'Attendance report', leaves: 'Leaves & holidays', employees: 'Employees',
   log: 'Punch log', settings: 'Shifts & departments', devices: 'Devices', users: 'Users & permissions',
 };
 function showTab(name) {
@@ -477,64 +476,6 @@ async function loadDevices() {
     };
   });
 }
-
-/* ---------------- Mobile check-in ---------------- */
-let ciTimer = null;
-let ciOffset = 0; // server (device-local) time minus browser time, so the clock matches recorded punches
-const CI_KEY = 'checkin-pin';
-
-async function loadCheckin() {
-  if (!employees.length) await loadEmployeeList();
-  let saved = '';
-  try { saved = localStorage.getItem(CI_KEY) || ''; } catch (_) {}
-  $('ciPin').innerHTML = '<option value="">Select employee</option>' + employees.filter((e) => e.active)
-    .map((e) => `<option value="${esc(e.pin)}">${esc(e.pin)} - ${esc(e.name || 'No name')}</option>`).join('');
-  $('ciPin').value = saved;
-  tickClock();
-  clearInterval(ciTimer);
-  ciTimer = setInterval(() => { if ($('tab-checkin').hidden) clearInterval(ciTimer); else tickClock(); }, 1000);
-  await refreshCheckin();
-}
-
-function tickClock() {
-  const now = new Date(Date.now() + ciOffset);
-  $('ciClock').textContent = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
-  $('ciDate').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-}
-
-function renderCheckin(punches) {
-  const next = punches.length ? 'Check out' : 'Check in';
-  $('ciBtn').textContent = next;
-  $('ciBtn').classList.toggle('out', punches.length > 0);
-  $('ciBtn').disabled = !$('ciPin').value;
-  $('ciHint').textContent = !$('ciPin').value ? 'Select an employee to start.'
-    : punches.length ? `Checked in at ${punches[0].punch_time.slice(11, 16)}` : 'Not checked in today.';
-  $('ciList').innerHTML = punches.map((p, i) => `<div class="checkin-row">
-    <span>${i === 0 ? 'Check in' : 'Check out'}</span><span class="num">${p.punch_time.slice(11, 16)}</span></div>`).join('');
-}
-
-async function refreshCheckin() {
-  const pin = $('ciPin').value;
-  const { now, punches } = await api('/api/mobile/status?pin=' + encodeURIComponent(pin));
-  ciOffset = Date.parse(now.replace(' ', 'T') + 'Z') - Date.now();
-  tickClock();
-  renderCheckin(punches);
-}
-
-$('ciPin').onchange = () => {
-  try { localStorage.setItem(CI_KEY, $('ciPin').value); } catch (_) {}
-  refreshCheckin();
-};
-$('ciBtn').onclick = async () => {
-  $('ciBtn').disabled = true;
-  try {
-    const r = await send('/api/mobile/punch', 'POST', { pin: $('ciPin').value });
-    toast(`${r.status ? 'Checked out' : 'Checked in'} at ${r.time.slice(11, 16)}`);
-    renderCheckin(r.punches);
-  } finally {
-    $('ciBtn').disabled = !$('ciPin').value;
-  }
-};
 
 /* ---------------- Users & permissions ---------------- */
 let roles = [];
