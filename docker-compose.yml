@@ -1,5 +1,7 @@
 # Local run: docker compose up -d   then open http://localhost:8090
 # Change the port on your machine with APP_PORT in .env (the device uses the same port)
+# Fixed project name so the data volume stays the same whatever the folder is called
+name: es-attendance
 services:
   db:
     image: postgres:16-alpine
