@@ -1,4 +1,5 @@
-# Local run: docker compose up -d   then open http://localhost:8080
+# Local run: docker compose up -d   then open http://localhost:8090
+# Change the port on your machine with APP_PORT in .env (the device uses the same port)
 services:
   db:
     image: postgres:16-alpine
@@ -27,7 +28,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-change-me-to-a-long-random-string}
       PORT: 8080
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8090}:8080"
 
 volumes:
   pgdata:
