@@ -334,6 +334,18 @@ function renderStats(recs, pins, days, single) {
     return;
   }
   const activeDays = new Set(recs.map((r) => r.day)).size;
+  if (state.pin) {
+    // one employee: show their own numbers
+    const outs = recs.filter((r) => r.outMin != null);
+    const avgOut = outs.length ? fmtMin(outs.reduce((s, r) => s + r.outMin, 0) / outs.length) : '—';
+    $('stats').innerHTML =
+      stat('Days present', activeDays, `of ${days.length} days`) +
+      stat('Late days', late, recs.length ? `${Math.round((late / recs.length) * 100)}% of days present` : '') +
+      stat('Average first in', avgIn) +
+      stat('Average last out', avgOut) +
+      stat('Average hours', avgDur, `${fmtDur(durs.reduce((s, r) => s + r.dur, 0))} total`);
+    return;
+  }
   const perDay = activeDays ? (recs.length / activeDays).toFixed(1) : '0';
   const totalMin = durs.reduce((s, r) => s + r.dur, 0);
   $('stats').innerHTML =
@@ -388,7 +400,9 @@ function emptyChart(id, msg) { $(id).innerHTML = `<div class="empty-chart">${msg
 function renderDaily(recs, days, pins) {
   $('chartMainTitle').textContent = 'Attendance per day';
   $('chartMainSub').textContent = 'Employees who punched each day, split by on time and late';
-  $('chartMainLegend').innerHTML = '<span><i class="sw ok"></i>On time</span><span><i class="sw late"></i>Late</span>';
+  const roster = state.sn ? 0 : pins.length;
+  $('chartMainLegend').innerHTML = '<span><i class="sw ok"></i>On time</span><span><i class="sw late"></i>Late</span>' +
+    (roster ? '<span><i class="sw track"></i>No punch</span>' : '');
   const byDay = new Map(days.map((d) => [d, { ok: 0, late: 0, punches: 0 }]));
   for (const r of recs) { const b = byDay.get(r.day); if (!b) continue; r.late ? b.late++ : b.ok++; b.punches += r.punches; }
   if (!recs.length) return emptyChart('chartMain', 'No punches in this period. Pick another period or a shaded day in the calendar.');
@@ -397,7 +411,7 @@ function renderDaily(recs, days, pins) {
   const W = Math.max(300, box.clientWidth), H = 240;
   const m = { l: 34, r: 8, t: 10, b: 28 };
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
-  const max = niceMax(Math.max(...[...byDay.values()].map((b) => b.ok + b.late)));
+  const max = niceMax(Math.max(roster, ...[...byDay.values()].map((b) => b.ok + b.late)));
   const s = svg(W, H);
   for (const t of yTicks(max)) {
     const y = m.t + ih - (t / max) * ih;
@@ -413,6 +427,7 @@ function renderDaily(recs, days, pins) {
     const hOk = (b.ok / max) * ih, hLate = (b.late / max) * ih;
     const base = m.t + ih;
     const gap = b.ok && b.late ? 2 : 0;
+    if (roster) el('path', { d: barPath(x, base - (roster / max) * ih, bw, (roster / max) * ih), class: 'f-track' }, s);
     if (b.ok) el('path', { d: b.late ? `M${x},${base}V${base - hOk}H${x + bw}V${base}Z` : barPath(x, base - hOk, bw, hOk), class: 'f-ok' }, s);
     if (b.late) el('path', { d: barPath(x, base - hOk - hLate, bw, Math.max(0, hLate - gap)), class: 'f-late' }, s);
     if (i % labelEvery === 0) {
@@ -512,7 +527,8 @@ function renderArrival(recs) {
   const W = Math.max(280, box.clientWidth), H = 220;
   const m = { l: 30, r: 8, t: 10, b: 28 };
   const iw = W - m.l - m.r, ih = H - m.t - m.b;
-  const max = niceMax(Math.max(...bins.map((b) => b.n)));
+  const peakN = Math.max(...bins.map((b) => b.n));
+  const max = niceMax(peakN);
   const s = svg(W, H);
   for (const t of yTicks(max)) {
     const y = m.t + ih - (t / max) * ih;
@@ -525,6 +541,7 @@ function renderArrival(recs) {
     const x = m.l + i * step + (step - bw) / 2;
     const h = (b.n / max) * ih;
     if (b.n) el('path', { d: barPath(x, m.t + ih - h, bw, h), class: b.late ? 'f-late' : 'f-ok' }, s);
+    if (b.n && b.n === peakN) txt(s, x + bw / 2, m.t + ih - h - 5, String(b.n), { 'text-anchor': 'middle', class: 'peak-label' });
     if (i % every === 0) txt(s, m.l + i * step + step / 2, H - 8, fmtMin(b.t), { 'text-anchor': 'middle' });
     const hit = el('rect', { x: m.l + i * step, y: m.t, width: step, height: ih, class: 'hit' }, s);
     hit.onmousemove = (e) => showTip(e, `<div class="t-title">${fmtMin(b.t)} – ${fmtMin(b.t + slot)}</div>` +
@@ -568,11 +585,13 @@ function renderHours() {
   const step = iw / hours.length, bw = Math.max(2, Math.min(28, step - 3));
   const every = Math.ceil(hours.length / Math.max(1, Math.floor(iw / 40)));
   const total = rows.reduce((s2, r) => s2 + r.punches, 0);
+  const peak = Math.max(...rows.map((r) => r.punches));
   hours.forEach((h, i) => {
     const n = byH.get(h) || 0;
     const x = m.l + i * step + (step - bw) / 2;
     const bh = (n / max) * ih;
-    if (n) el('path', { d: barPath(x, m.t + ih - bh, bw, bh), class: 'f-accent' }, s);
+    if (n) el('path', { d: barPath(x, m.t + ih - bh, bw, bh), class: 'f-mag' }, s);
+    if (n && n === peak) txt(s, x + bw / 2, m.t + ih - bh - 5, String(n), { 'text-anchor': 'middle', class: 'peak-label' });
     if (i % every === 0) txt(s, m.l + i * step + step / 2, H - 8, String(h).padStart(2, '0'), { 'text-anchor': 'middle' });
     const hit = el('rect', { x: m.l + i * step, y: m.t, width: step, height: ih, class: 'hit' }, s);
     hit.onmousemove = (e) => showTip(e, `<div class="t-title">${String(h).padStart(2, '0')}:00 – ${String(h).padStart(2, '0')}:59</div>` +
