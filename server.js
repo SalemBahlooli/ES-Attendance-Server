@@ -6,6 +6,7 @@ const { buildWorkbook } = require('./export');
 const { buildTimesheet } = require('./timesheet');
 const importer = require('./lib/importer');
 const zkLan = require('./lib/zk-lan');
+const branch = require('./lib/branch');
 const auth = require('./auth');
 const { requireAuth, need, audit } = auth;
 
@@ -316,6 +317,27 @@ const bigText = express.text({ type: () => true, limit: '60mb' });
 api.post('/import/file', need('data.import'), bigText, h(async (req, res) => {
   const text = typeof req.body === 'string' ? req.body : '';
   const filename = String(req.query.filename || '').slice(0, 200);
+
+  // A file exported by another branch running this program
+  if (text.trimStart().startsWith('{')) {
+    let pkg;
+    try { pkg = JSON.parse(text); } catch (_) { return res.status(400).json({ error: 'This file could not be read' }); }
+    try {
+      if (req.query.dry) return res.json({ kind: 'branch', ...(await branch.preview(pool, pkg)) });
+      const r = await branch.apply(pool, pkg, { withLeaves: req.query.leaves !== '0', username: req.user.username });
+      const period = pkg.period ? `${pkg.period.from} to ${pkg.period.to}` : '';
+      await importer.logImport(pool, {
+        source: 'branch', label: `${r.branchName}${period ? ' · ' + period : ''}`, sn: r.branchName,
+        result: r, names: r.newEmployees, username: req.user.username,
+      });
+      await audit(req, 'Import from another branch',
+        `${r.branchName} (${period}): ${r.inserted} new punches, ${r.newEmployees} new employees, ${r.removed} removed, ${r.leaves} leaves`);
+      return res.json({ kind: 'branch', ...r, period: pkg.period });
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+  }
+
   const parsed = importer.parseAttendanceText(text, { filename, dateOrder: req.query.dateOrder === 'mdy' ? 'mdy' : 'dmy' });
   if (!parsed.rows.length) {
     return res.status(400).json({
@@ -361,6 +383,30 @@ api.post('/import/records', need('data.import'), express.json({ limit: '60mb' })
     await audit(req, 'Import punches from LAN bridge', `${ip || sn}: ${result.inserted} new of ${result.total}`);
   }
   res.json({ ...result, names, skipped });
+}));
+
+/* Share attendance with another branch */
+
+api.get('/branch', need('report.export', 'data.import'), h(async (req, res) => {
+  res.json({ name: await branch.getBranchName(pool) });
+}));
+
+// Downloads a file for the other branch to import. Query: from, to, department_id, branch (this branch's name)
+api.get('/branch/export', need('report.export'), h(async (req, res) => {
+  const { from, to } = req.query;
+  if (!rangeOk(from, to)) return res.status(400).json({ error: 'Pick a period of one year or less' });
+  const name = text(req.query.branch) || await branch.getBranchName(pool);
+  if (!name) return res.status(400).json({ error: 'Enter the name of this branch' });
+  await branch.saveBranchName(pool, name.slice(0, 100));
+  const pkg = await branch.buildExport(pool, {
+    from, to, departmentId: intOrNull(req.query.department_id), branch: name.slice(0, 100), username: req.user.username,
+  });
+  await audit(req, 'Export for another branch',
+    `${from} to ${to}: ${pkg.employees.length} employees, ${pkg.punches.length} punches`);
+  const safe = name.replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '') || 'branch';
+  res.set('Content-Type', 'application/json; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="Attendance_${safe}_${from}_${to}.json"`);
+  res.send(JSON.stringify(pkg));
 }));
 
 api.get('/imports', need('data.import'), h(async (req, res) => {

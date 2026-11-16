@@ -63,6 +63,12 @@ async function init() {
     ALTER TABLE devices ADD COLUMN IF NOT EXISTS lan_ip TEXT;
     ALTER TABLE devices ADD COLUMN IF NOT EXISTS lan_port INT;
 
+    -- Simple key/value settings (branch name for sharing with other branches)
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS imports (
       id BIGSERIAL PRIMARY KEY,
       source TEXT NOT NULL,

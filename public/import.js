@@ -38,6 +38,7 @@ async function impCheck() {
   let r;
   try { r = await impPost({ dry: '1' }); }
   catch (e) { return impPreview(`<div class="result err">${esc(e.message || 'Could not read this file')}</div>`); }
+  if (r.kind === 'branch') return impBranchPreview(r);
   const fresh = Math.max(0, r.count - r.existing);
   impPreview(`<div class="result">
     <strong>${esc(impName)}</strong>
@@ -61,12 +62,56 @@ async function impCheck() {
   $('impCancel').onclick = impReset;
 }
 
+function impBranchPreview(r) {
+  const fresh = r.new_punches;
+  const newEmps = r.employees.filter((e) => !e.exists).length;
+  const anything = fresh || newEmps || r.removed || r.leaves;
+  impPreview(`<div class="result">
+    <strong>File from ${esc(r.branch && r.branch.name || 'another branch')}</strong>
+    <dl class="kv">
+      <dt>Period</dt><dd>${niceDate(r.period.from, { year: true })} – ${niceDate(r.period.to, { year: true })}</dd>
+      <dt>Made by</dt><dd>${esc(r.exported_by || '—')} · ${dateTime(r.exported_at)}</dd>
+      <dt>Employees</dt><dd>${r.employees.length}${newEmps ? ` (${newEmps} new here)` : ' (all already here)'}</dd>
+      <dt>Punches</dt><dd>${r.punches}</dd>
+      <dt>New punches</dt><dd><b>${fresh}</b></dd>
+      ${r.removed ? `<dt>Removed there</dt><dd>${r.removed} (removed here too, if present)</dd>` : ''}
+      ${r.leaves ? `<dt>Leaves</dt><dd>${r.leaves}</dd>` : ''}
+    </dl>
+    <details><summary>Employees in this file</summary>
+      <table><thead><tr><th>ID</th><th>Name</th><th>Department</th><th></th></tr></thead><tbody>
+        ${r.employees.map((e) => `<tr><td class="num">${esc(e.pin)}</td><td>${nameCell(e.name)}</td><td>${esc(e.department) || '—'}</td>
+          <td>${e.exists ? '<span class="pill off">Already here</span>' : '<span class="pill info">New</span>'}</td></tr>`).join('')}
+      </tbody></table>
+    </details>
+    ${r.leaves ? '<label class="check"><input type="checkbox" id="impLeaves" checked> Also import their leaves</label>' : ''}
+    <div class="actions">
+      <button class="btn primary" id="impGo">${anything ? 'Import' : 'Import anyway'}</button>
+      <button class="btn" id="impCancel">Cancel</button>
+    </div></div>`);
+  $('impGo').onclick = impCommit;
+  $('impCancel').onclick = impReset;
+}
+
 async function impCommit() {
   $('impGo').disabled = true;
   $('impGo').textContent = 'Importing…';
   let r;
-  try { r = await impPost({ sn: $('impSn').value || 'USB' }); }
+  const extra = $('impLeaves') && !$('impLeaves').checked ? { leaves: '0' } : {};
+  try { r = await impPost({ sn: $('impSn').value || 'USB', ...extra }); }
   catch (e) { return impPreview(`<div class="result err">${esc(e.message || 'Import failed')}</div>`); }
+  if (r.kind === 'branch') {
+    impText = null;
+    $('impFile').value = '';
+    impPreview(`<div class="result ok"><strong>Imported from ${esc(r.branchName)}</strong>
+      <span>${r.inserted} new punches${r.duplicates ? ` (${r.duplicates} were already here)` : ''}, ${r.newEmployees} new employees${r.removed ? `, ${r.removed} punches removed` : ''}${r.leaves ? `, ${r.leaves} leaves` : ''}.</span>
+      ${canTab('overview') ? '<div class="actions"><button class="btn small" id="impView">View these days</button></div>' : ''}</div>`);
+    if ($('impView')) $('impView').onclick = () => {
+      const last = r.period.to < meta.today ? r.period.to : meta.today;
+      ov.from = r.period.from; ov.to = last; ov.pin = ''; ov.calMonth = last.slice(0, 7);
+      showTab('overview');
+    };
+    return impAfterChange();
+  }
   impText = null;
   $('impFile').value = '';
   impPreview(`<div class="result ok"><strong>Import complete</strong>
@@ -145,7 +190,7 @@ $('lanPull').onclick = async () => {
 };
 
 /* History */
-const IMP_SRC = { file: 'File / USB', lan: 'LAN', 'lan-bridge': 'LAN bridge' };
+const IMP_SRC = { file: 'File / USB', lan: 'LAN', 'lan-bridge': 'LAN bridge', branch: 'Other branch' };
 async function loadImports() {
   const rows = await api('/api/imports');
   $('impRows').innerHTML = rows.length ? rows.map((r) => `<tr>
@@ -157,6 +202,8 @@ async function loadImports() {
 }
 
 async function loadImport() {
+  if (can('report.export')) brLoad();
+  if (!can('data.import')) return;
   bridgeCmd();
   if (can('devices.view')) {
     try { impDevices = await api('/api/devices'); } catch (_) { impDevices = []; }
@@ -167,3 +214,41 @@ async function loadImport() {
   if (lan && !$('lanIp').value) { $('lanIp').value = lan.lan_ip; $('lanPort').value = lan.lan_port || 4370; bridgeCmd(); }
   loadImports();
 }
+
+/* Send to another branch */
+let brReady = false;
+async function brLoad() {
+  $('brDept').innerHTML = options(meta.departments, $('brDept').value, 'All departments');
+  if (brReady) return;
+  brReady = true;
+  const [f, t] = edPreset('lastmonth');
+  $('brFrom').value = f; $('brTo').value = t;
+  try { $('brName').value = (await api('/api/branch')).name || ''; } catch (_) {}
+}
+document.querySelectorAll('#brPresets button').forEach((b) => {
+  b.onclick = () => { const [f, t] = edPreset(b.dataset.preset); $('brFrom').value = f; $('brTo').value = t; };
+});
+$('brExport').onclick = async () => {
+  const name = $('brName').value.trim();
+  if (!name) { $('brName').focus(); return toast('Enter the name of this branch'); }
+  const from = $('brFrom').value, to = $('brTo').value;
+  if (!from || !to || from > to) return toast('Check the dates');
+  const p = new URLSearchParams({ from, to, branch: name });
+  if ($('brDept').value) p.set('department_id', $('brDept').value);
+  // fetch first so an error shows as a message instead of opening a blank page
+  $('brExport').disabled = true;
+  try {
+    const res = await fetch('/api/branch/export?' + p);
+    if (!res.ok) { const e = await res.json().catch(() => ({})); return toast(e.error || 'Could not make the file'); }
+    const blob = await res.blob();
+    const m = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = m ? m[1] : 'Attendance.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast('File ready. Send it to the other branch');
+  } finally {
+    $('brExport').disabled = false;
+  }
+};

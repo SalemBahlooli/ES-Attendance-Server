@@ -15,11 +15,11 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 let meta = { today: '', leaveTypes: [], shifts: [], departments: [], me: { permissions: [] }, permissionList: [] };
 const can = (perm) => meta.me.permissions.includes(perm);
 const TAB_PERM = {
-  overview: 'report.view', import: 'data.import',
+  overview: 'report.view', import: ['data.import', 'report.export'],
   today: 'attendance.view', report: 'report.view', leaves: 'leaves.view', employees: 'employees.view',
   log: 'punches.view', settings: 'settings.edit', devices: 'devices.view', users: 'users.manage',
 };
-const canTab = (tab) => can(TAB_PERM[tab]);
+const canTab = (tab) => [].concat(TAB_PERM[tab] || []).some(can);
 let employees = [];
 let report = null;
 
@@ -101,7 +101,7 @@ const loaders = {
   log: loadLog, settings: loadSettings, devices: loadDevices, users: loadUsers,
 };
 const TITLES = {
-  overview: 'Overview', import: 'Import data',
+  overview: 'Overview', import: 'Import & export',
   today: 'Daily attendance', report: 'Attendance report', leaves: 'Leaves & holidays', employees: 'Employees',
   log: 'Punch log', settings: 'Shifts & departments', devices: 'Devices', users: 'Users & permissions',
 };

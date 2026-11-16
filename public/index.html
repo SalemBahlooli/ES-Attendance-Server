@@ -46,7 +46,7 @@
     <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>Punch log</button>
     <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>Shifts &amp; departments</button>
     <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>Devices</button>
-    <button class="nav-item" data-tab="import"><svg class="icon"><use href="#i-import"/></svg>Import data</button>
+    <button class="nav-item" data-tab="import"><svg class="icon"><use href="#i-import"/></svg>Import &amp; export</button>
     <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>Users &amp; permissions</button>
   </nav>
   <div class="user-box">
@@ -175,15 +175,16 @@
   <!-- Import data -->
   <section id="tab-import" hidden>
     <div class="import-grid">
-      <div class="card pad">
+      <div class="card pad" data-perm="data.import">
         <h3>From USB or a file</h3>
         <ol class="steps muted">
           <li>On the device: <b>Menu → PenDrive Mng</b> (or <b>USB Manager</b>) <b>→ Download AttLog</b>.</li>
           <li>Plug the USB stick into this computer and choose the file, usually <span class="code">1_attlog.dat</span> or <span class="code">&lt;serial&gt;_attlog.dat</span>.</li>
           <li>CSV or TXT files also work, for example an export from ZKTeco software saved as CSV. They need an employee ID column and a date/time column.</li>
+          <li>A file sent by another branch (<span class="code">Attendance_….json</span>) is imported here too.</li>
         </ol>
         <label class="drop" id="impDrop">
-          <input type="file" id="impFile" accept=".dat,.txt,.csv,.tsv,.log,text/plain,text/csv" hidden>
+          <input type="file" id="impFile" accept=".dat,.txt,.csv,.tsv,.log,.json,text/plain,text/csv,application/json" hidden>
           <strong>Drop the file here</strong>
           <span class="muted">or click to choose it</span>
         </label>
@@ -199,7 +200,7 @@
         <div id="impPreview"></div>
       </div>
 
-      <div class="card pad">
+      <div class="card pad" data-perm="data.import">
         <h3>From the device over the LAN</h3>
         <p class="muted">Reads all punches and employee names straight from the device on port 4370.
           This works when this server runs on the same network as the device, for example in Docker on an office PC.</p>
@@ -224,7 +225,30 @@
         <div class="codeblock"><code id="bridgeCmd"></code><button class="btn small" id="copyBridge">Copy</button></div>
       </div>
 
-      <div class="card table-wrap span2">
+      <div class="card pad span2 branch-card" data-perm="report.export">
+        <div class="branch-intro">
+          <h3>Send to another branch</h3>
+          <p class="muted">Make a file with your employees' attendance for a period. Send it to the other branch (email, WhatsApp…);
+            they import it from <b>Import &amp; export → From USB or a file</b> and your employees appear there with their punches,
+            leaves, department and shift. Sending a newer file for the same period only adds what changed.</p>
+        </div>
+        <div class="branch-form">
+          <label>This branch name <input id="brName" maxlength="100"></label>
+          <label>From <input type="date" id="brFrom"></label>
+          <label>To <input type="date" id="brTo"></label>
+          <label>Department <select id="brDept"></select></label>
+          <div class="branch-actions">
+            <div class="presets" id="brPresets">
+              <button type="button" data-preset="month">This month</button>
+              <button type="button" data-preset="lastmonth">Last month</button>
+              <button type="button" data-preset="timesheet">Timesheet period</button>
+            </div>
+            <button class="btn primary" id="brExport">Download file</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card table-wrap span2" data-perm="data.import">
         <div class="table-head"><h4>Import history</h4></div>
         <table>
           <thead><tr><th>When</th><th>Source</th><th>File / address</th><th>Device</th><th>Records</th><th>New</th><th>Already saved</th><th>Names added</th><th>By</th></tr></thead>
@@ -487,7 +511,7 @@
     <button class="nav-item" data-tab="log"><svg class="icon"><use href="#i-log"/></svg>Punch log</button>
     <button class="nav-item" data-tab="settings"><svg class="icon"><use href="#i-settings"/></svg>Shifts &amp; departments</button>
     <button class="nav-item" data-tab="devices"><svg class="icon"><use href="#i-devices"/></svg>Devices</button>
-    <button class="nav-item" data-tab="import"><svg class="icon"><use href="#i-import"/></svg>Import data</button>
+    <button class="nav-item" data-tab="import"><svg class="icon"><use href="#i-import"/></svg>Import &amp; export</button>
     <button class="nav-item" data-tab="users"><svg class="icon"><use href="#i-users"/></svg>Users &amp; permissions</button>
   <div class="sheet-sep"></div>
   <button class="nav-item" data-action="password"><svg class="icon"><use href="#i-key"/></svg>Change password</button>
