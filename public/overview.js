@@ -271,7 +271,7 @@ function ovStats(rows, single) {
       stat('Absent', n('absent'), '', 'danger') +
       stat('On leave', n('leave'), '', 'info') +
       stat('Not in yet', rows.filter((r) => r.status === 'not_yet').length, '', 'muted') +
-      stat('Average first in', avgIn);
+      stat('Avg first in', avgIn);
     return;
   }
   const workDays = rows.filter((r) => ['present', 'late', 'absent', 'leave'].includes(r.status)).length;
@@ -281,8 +281,8 @@ function ovStats(rows, single) {
     stat('Late arrivals', n('late'), lateMin ? `${fmtDur(lateMin)} in total` : '', 'warn') +
     stat('Absences', n('absent'), 'work days with no punch', 'danger') +
     stat('Leave days', n('leave'), '', 'info') +
-    stat('Average first in', avgIn) +
-    stat('Average worked', avgWork, 'first in to last out');
+    stat('Avg first in', avgIn) +
+    stat('Avg worked', avgWork, 'first in to last out');
 }
 
 /* ---------- SVG helpers ---------- */

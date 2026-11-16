@@ -253,19 +253,19 @@ td.wrap { white-space: normal; min-width: 220px; }
 /* ---------------- Overview & charts ---------------- */
 /* Chart colors, checked for color-blind separation in both modes */
 :root {
-  --c-ok: #12936e; --c-late: #e5850f; --c-leave: #2f7fd1; --c-absent: #d6456a; --c-mag: #5b5bd6;
+  --c-ok: #2e9479; --c-late: #cf9a45; --c-leave: #5787c9; --c-absent: #c46a78; --c-mag: #6a84a6;
   --c-offday: #efede7; --c-empty: transparent; --c-empty-line: #e3e0d8; --c-hatch: rgba(255, 255, 255, .55);
   --grid: #eeece6;
-  --heat-1: #e6e6fb; --heat-2: #c6c6f6; --heat-3: #9d9def; --heat-4: #7373e3; --heat-5: #4f4fc4;
-  --heat-ink-1: #2b2b5c; --heat-ink-2: #2b2b5c; --heat-ink-3: #1d1d40; --heat-ink-4: #ffffff; --heat-ink-5: #ffffff;
+  --heat-1: #e7ecf2; --heat-2: #cdd7e4; --heat-3: #a9b9cf; --heat-4: #7f96b4; --heat-5: #5a7395;
+  --heat-ink-1: #2c3a4d; --heat-ink-2: #2c3a4d; --heat-ink-3: #1f2a38; --heat-ink-4: #ffffff; --heat-ink-5: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --c-ok: #1fa97d; --c-late: #c47a12; --c-leave: #4a8fe0; --c-absent: #e0587c; --c-mag: #7b7be8;
+    --c-ok: #2f9a7d; --c-late: #b8883a; --c-leave: #5a8ad0; --c-absent: #c86a7b; --c-mag: #7b93b4;
     --c-offday: #262624; --c-empty-line: #34342f; --c-hatch: rgba(0, 0, 0, .35);
     --grid: #2b2b28;
-    --heat-1: #2a2a4d; --heat-2: #3a3a78; --heat-3: #5050a8; --heat-4: #6d6dd8; --heat-5: #a5a5f0;
-    --heat-ink-1: #d9d9f5; --heat-ink-2: #ececfb; --heat-ink-3: #ffffff; --heat-ink-4: #ffffff; --heat-ink-5: #15153a;
+    --heat-1: #28303b; --heat-2: #34425a; --heat-3: #4a5d7a; --heat-4: #6a82a5; --heat-5: #a3b5cf;
+    --heat-ink-1: #d5dce6; --heat-ink-2: #e4e9f0; --heat-ink-3: #ffffff; --heat-ink-4: #ffffff; --heat-ink-5: #16202e;
   }
 }
 
@@ -423,3 +423,9 @@ a { color: var(--accent); }
   .chart-row { grid-template-columns: minmax(0, 1fr); }
   .table-head input { min-width: 0; flex: 1; }
 }
+
+/* footer */
+.site-footer { text-align: center; color: var(--muted); font-size: 13px; padding: 28px 12px 8px; }
+.site-footer strong { color: var(--text); font-weight: 600; }
+.login-body { grid-template-rows: 1fr auto; }
+.login-body .site-footer { padding-bottom: 20px; }
