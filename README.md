@@ -19,6 +19,26 @@ An attendance server that receives punches directly from a **ZKTeco uFace 800** 
    - **Generate Domain**: the dashboard URL you open in the browser.
    - **TCP Proxy** on port `8080` (or the value of `PORT`): the address you enter on the device.
 
+## Running locally with Docker (on an office PC)
+
+Use this when you want the server inside the office network, so it can also pull punches straight from the device over the LAN.
+
+1. Install Docker Desktop and download this repository.
+2. Copy `.env.example` to `.env` and set `ADMIN_PASSWORD` (and `SESSION_SECRET`).
+3. In the repository folder run:
+
+   ```
+   docker compose up -d --build
+   ```
+
+4. Open `http://localhost:3000`. From other PCs use `http://<this-PC-IP>:3000`.
+
+Pulling over the LAN: **Import Data → From the device over LAN**, enter the device IP (e.g. `192.168.1.201`) and port `4370`, click **Test connection**, then **Pull punches now**. After the first pull, the device card in **Devices** gets a "Pull over LAN" button.
+
+Live punches (optional): on the device set **Cloud Server** to this PC's IP and port `3000` (Enable Domain Name: OFF). Allow port 3000 in the PC firewall.
+
+The data lives in the Docker volume `pgdata`. `docker compose down` keeps it; `docker compose down -v` deletes it.
+
 ## Device setup
 
 **Menu → COMM → Cloud Server Setting**
