@@ -18,6 +18,7 @@ const PERMISSIONS = [
   { key: 'settings.edit', group: 'Settings', label: 'Manage shifts and departments' },
   { key: 'devices.view', group: 'Settings', label: 'View devices' },
   { key: 'devices.manage', group: 'Settings', label: 'Send device commands and rename devices' },
+  { key: 'data.import', group: 'Settings', label: 'Import punches from USB, files or the LAN' },
   { key: 'users.manage', group: 'Settings', label: 'Manage users, permissions and the audit log' },
 ];
 const ALL = PERMISSIONS.map((p) => p.key);

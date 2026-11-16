@@ -15,6 +15,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 let meta = { today: '', leaveTypes: [], shifts: [], departments: [], me: { permissions: [] }, permissionList: [] };
 const can = (perm) => meta.me.permissions.includes(perm);
 const TAB_PERM = {
+  overview: 'report.view', import: 'data.import',
   today: 'attendance.view', report: 'report.view', leaves: 'leaves.view', employees: 'employees.view',
   log: 'punches.view', settings: 'settings.edit', devices: 'devices.view', users: 'users.manage',
 };
@@ -94,10 +95,13 @@ async function loadEmployeeList() {
 
 /* Tabs */
 const loaders = {
+  // overview.js and import.js load after this file
+  overview: () => loadOverview(), import: () => loadImport(),
   today: loadToday, report: loadReport, leaves: loadLeaves, employees: loadEmployees,
   log: loadLog, settings: loadSettings, devices: loadDevices, users: loadUsers,
 };
 const TITLES = {
+  overview: 'Overview', import: 'Import data',
   today: 'Daily attendance', report: 'Attendance report', leaves: 'Leaves & holidays', employees: 'Employees',
   log: 'Punch log', settings: 'Shifts & departments', devices: 'Devices', users: 'Users & permissions',
 };
@@ -109,7 +113,7 @@ function showTab(name) {
     return;
   }
   document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
-  $('moreBtn').classList.toggle('active', ['log', 'settings', 'devices', 'users'].includes(name));
+  $('moreBtn').classList.toggle('active', ['leaves', 'log', 'settings', 'devices', 'import', 'users'].includes(name));
   $('moreSheet').hidden = true;
   $('pageTitle').textContent = TITLES[name];
   document.querySelectorAll('main section').forEach((s) => (s.hidden = s.id !== 'tab-' + name));
@@ -454,16 +458,27 @@ async function loadDevices() {
         <span>Last seen: <span class="num">${dateTime(d.last_seen)}</span></span>
         <span>Total punches: <span class="num">${d.total}</span></span>
         ${d.pending ? `<span>Pending commands: <span class="num">${d.pending}</span></span>` : ''}
+        ${d.lan_ip ? `<span>LAN address: <span class="num">${esc(d.lan_ip)}:${esc(d.lan_port || 4370)}</span></span>` : ''}
       </div>
-      <div class="actions" ${can('devices.manage') ? '' : 'hidden'}>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">Pull employee names from device</button>
+      <div class="actions" ${can('devices.manage') || (d.lan_ip && can('data.import')) ? '' : 'hidden'}>
+        ${can('devices.manage') ? `<button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">Pull employee names from device</button>
         <button class="btn small" data-sn="${esc(d.sn)}" data-act="resend-logs">Re-pull all punches</button>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">Rename device</button>
+        <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">Rename device</button>` : ''}
+        ${d.lan_ip && can('data.import') ? `<button class="btn small" data-sn="${esc(d.sn)}" data-act="lan" data-ip="${esc(d.lan_ip)}" data-port="${esc(d.lan_port || 4370)}">Pull over LAN</button>` : ''}
       </div></div>`;
   }).join('') : '<div class="card empty">No device has connected yet. Set up Cloud Server on the device and it will appear here within a minute.</div>';
   document.querySelectorAll('[data-act]').forEach((b) => {
     b.onclick = async () => {
       const sn = b.dataset.sn;
+      if (b.dataset.act === 'lan') {
+        b.disabled = true;
+        b.textContent = 'Pulling…';
+        try {
+          const r = await lanPull(b.dataset.ip, b.dataset.port);
+          toast(`${r.inserted} new punches saved (${r.total} on the device)`);
+        } catch (_) {}
+        return loadDevices();
+      }
       if (b.dataset.act === 'rename') {
         const name = prompt('Device name');
         if (name === null) return;

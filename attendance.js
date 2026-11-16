@@ -111,7 +111,7 @@ async function compute(from, to) {
         date, day_name: DAY_NAMES[dow], pin: emp.pin, name: emp.name,
         department_id: emp.department_id, department: emp.department,
         shift: shift.name, shift_start: shift.start_time.slice(0, 5), shift_end: shift.end_time.slice(0, 5),
-        first_in: null, last_out: null, punches: ps.length, worked_minutes: 0,
+        first_in: null, last_out: null, punches: ps.length, times: ps.map((p) => fmtTs(p).slice(11, 16)), worked_minutes: 0,
         late_minutes: 0, early_minutes: 0, missing_out: false, status: null, note: null,
       };
 

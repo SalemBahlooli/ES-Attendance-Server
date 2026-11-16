@@ -4,6 +4,8 @@ const { pool, init } = require('./db');
 const { compute, today, LEAVE_TYPES } = require('./attendance');
 const { buildWorkbook } = require('./export');
 const { buildTimesheet } = require('./timesheet');
+const importer = require('./lib/importer');
+const zkLan = require('./lib/zk-lan');
 const auth = require('./auth');
 const { requireAuth, need, audit } = auth;
 
@@ -94,9 +96,12 @@ iclock.post('/cdata', async (req, res) => {
       for (const line of lines) {
         const [pin, time, status, verify] = line.split('\t');
         if (!pin || !time) continue;
+        // Skip punches already saved from another source (USB file, LAN) for the same employee and second
         const r = await pool.query(
-          `INSERT INTO attendance (sn, pin, punch_time, status, verify, raw)
-           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
+          `INSERT INTO attendance (sn, pin, punch_time, status, verify, raw, source)
+           SELECT $1::text, $2::text, $3::timestamp, $4::int, $5::int, $6::text, 'adms'
+           WHERE NOT EXISTS (SELECT 1 FROM attendance WHERE pin = $2::text AND punch_time = $3::timestamp)
+           ON CONFLICT DO NOTHING`,
           [sn, pin.trim(), time.trim(), parseInt(status, 10) || 0, parseInt(verify, 10) || 0, line]
         );
         saved += r.rowCount;
@@ -190,7 +195,9 @@ app.use('/iclock', iclock);
 /* ------------------------------------------------------------------ */
 
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+const jsonParser = express.json();
+// /api/import/records (LAN bridge) has its own, larger JSON limit
+app.use((req, res, next) => (req.path === '/api/import/records' ? next() : jsonParser(req, res, next)));
 
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
@@ -256,6 +263,140 @@ api.get('/report', need('report.view'), h(async (req, res) => {
   const { from, to } = req.query;
   if (!rangeOk(from, to)) return res.status(400).json({ error: 'bad range' });
   res.json(await compute(from, to));
+}));
+
+/* Overview: calendar and hourly chart */
+
+// Optional employee / department filter on the attendance table (alias a)
+function punchFilter(q) {
+  const { from, to } = q;
+  if (!isDate(from) || !isDate(to)) return null;
+  const params = [from, to];
+  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
+  if (q.pin) { params.push(String(q.pin)); where += ` AND a.pin = $${params.length}`; }
+  if (intOrNull(q.department_id)) {
+    params.push(intOrNull(q.department_id));
+    where += ` AND a.pin IN (SELECT pin FROM employees WHERE department_id = $${params.length})`;
+  }
+  return { where, params };
+}
+
+// Days that have punches, with how many employees punched (calendar shading)
+api.get('/days', need('report.view', 'attendance.view'), h(async (req, res) => {
+  const f = punchFilter(req.query);
+  if (!f) return res.status(400).json({ error: 'bad date' });
+  const { rows } = await pool.query(
+    `SELECT to_char(a.punch_time, 'YYYY-MM-DD') AS day, COUNT(*)::int AS punches, COUNT(DISTINCT a.pin)::int AS employees
+     FROM attendance a WHERE ${f.where} GROUP BY 1 ORDER BY 1`, f.params);
+  res.json(rows);
+}));
+
+api.get('/hours', need('report.view'), h(async (req, res) => {
+  const f = punchFilter(req.query);
+  if (!f) return res.status(400).json({ error: 'bad date' });
+  const { rows } = await pool.query(
+    `SELECT EXTRACT(HOUR FROM a.punch_time)::int AS hour, COUNT(*)::int AS punches
+     FROM attendance a WHERE ${f.where} GROUP BY 1 ORDER BY 1`, f.params);
+  res.json(rows);
+}));
+
+// First and last day with any punch
+api.get('/bounds', need('report.view', 'attendance.view'), h(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT to_char(MIN(punch_time), 'YYYY-MM-DD') AS first, to_char(MAX(punch_time), 'YYYY-MM-DD') AS last
+     FROM attendance`);
+  res.json(rows[0]);
+}));
+
+/* Import: USB / file / LAN */
+
+const bigText = express.text({ type: () => true, limit: '60mb' });
+
+// Raw file text. Query: filename, sn, dateOrder (dmy | mdy), dry=1 for a preview without saving
+api.post('/import/file', need('data.import'), bigText, h(async (req, res) => {
+  const text = typeof req.body === 'string' ? req.body : '';
+  const filename = String(req.query.filename || '').slice(0, 200);
+  const parsed = importer.parseAttendanceText(text, { filename, dateOrder: req.query.dateOrder === 'mdy' ? 'mdy' : 'dmy' });
+  if (!parsed.rows.length) {
+    return res.status(400).json({
+      error: 'No punches found in this file. Supported: attlog.dat from the device USB export, ' +
+        'or a CSV/TXT with an employee ID column and a date/time column.',
+    });
+  }
+  if (parsed.rows.length > importer.MAX_ROWS) return res.status(400).json({ error: 'The file is too large' });
+  const summary = importer.summarise(parsed.rows);
+
+  if (req.query.dry) {
+    const existing = await importer.countExisting(pool, parsed.rows);
+    return res.json({
+      format: parsed.format, skipped: parsed.skipped, ...summary, existing,
+      names: parsed.users.length, sample: parsed.rows.slice(0, 8).map(({ pin, time }) => ({ pin, time })),
+    });
+  }
+
+  const sn = String(req.query.sn || '').trim() || 'USB';
+  const result = await importer.savePunches(pool, parsed.rows, { sn, source: 'file' });
+  const names = await importer.saveUsers(pool, parsed.users);
+  await importer.logImport(pool, { source: 'file', label: filename, sn, result, names, username: req.user.username });
+  await audit(req, 'Import punches from file', `${filename}: ${result.inserted} new of ${result.total}`);
+  res.json({ ...summary, ...result, names, skipped: parsed.skipped });
+}));
+
+// Punches as JSON from tools/lan-bridge.js (a PC on the office network)
+api.post('/import/records', need('data.import'), express.json({ limit: '60mb' }), h(async (req, res) => {
+  const { rows, skipped } = importer.cleanRecords(req.body.records);
+  if (rows.length > importer.MAX_ROWS) return res.status(400).json({ error: 'Too many records' });
+  const sn = String(req.body.sn || '').trim() || 'LAN';
+  const ip = req.body.ip ? String(req.body.ip).slice(0, 100) : null;
+  if (sn !== 'LAN') {
+    await pool.query(
+      `INSERT INTO devices (sn, lan_ip) VALUES ($1, $2)
+       ON CONFLICT (sn) DO UPDATE SET lan_ip = COALESCE(EXCLUDED.lan_ip, devices.lan_ip)`, [sn, ip]);
+  }
+  const result = await importer.savePunches(pool, rows, { sn, source: 'lan' });
+  const names = await importer.saveUsers(pool, req.body.users);
+  // The bridge repeats every few minutes: only log runs that changed something (and the first run)
+  if (result.inserted || names || req.body.log !== false) {
+    await importer.logImport(pool, { source: 'lan-bridge', label: ip, sn, result, names, username: req.user.username });
+    await audit(req, 'Import punches from LAN bridge', `${ip || sn}: ${result.inserted} new of ${result.total}`);
+  }
+  res.json({ ...result, names, skipped });
+}));
+
+api.get('/imports', need('data.import'), h(async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM imports ORDER BY id DESC LIMIT 30');
+  res.json(rows);
+}));
+
+// Talk to the device directly on port 4370 (works when this server is on the same network)
+api.post('/lan/test', need('data.import'), h(async (req, res) => {
+  try {
+    res.json(await zkLan.deviceInfo({ ip: String(req.body.ip || '').trim(), port: req.body.port }));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+}));
+
+api.post('/lan/pull', need('data.import'), h(async (req, res) => {
+  const ip = String(req.body.ip || '').trim();
+  const port = parseInt(req.body.port, 10) || 4370;
+  let data;
+  try {
+    data = await zkLan.pullFromDevice({ ip, port, timeout: 20000 });
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  const sn = data.sn || `LAN-${ip}`;
+  await pool.query(
+    `INSERT INTO devices (sn, lan_ip, lan_port) VALUES ($1, $2, $3)
+     ON CONFLICT (sn) DO UPDATE SET lan_ip = EXCLUDED.lan_ip, lan_port = EXCLUDED.lan_port`,
+    [sn, ip, port]);
+  const result = await importer.savePunches(pool, data.rows, { sn, source: 'lan' });
+  const names = await importer.saveUsers(pool, data.users);
+  await importer.logImport(pool, { source: 'lan', label: `${ip}:${port}`, sn, result, names, username: req.user.username });
+  await audit(req, 'Pull punches over LAN', `${ip}:${port}: ${result.inserted} new of ${result.total}`);
+  console.log(`[LAN] ${ip}: ${result.inserted} new of ${result.total}`);
+  res.json({ sn, ...result, names, ...importer.summarise(data.rows) });
 }));
 
 /* Shifts */

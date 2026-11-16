@@ -3,7 +3,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 # Fail the build if the install silently broke (npm can exit 0 on network errors)
-RUN npm ci --omit=dev && node -e "require('express'); require('pg'); require('exceljs')"
+RUN npm ci --omit=dev && node -e "require('express'); require('pg'); require('exceljs'); require('zkteco-js')"
 COPY . .
 ENV PORT=8080
 EXPOSE 8080

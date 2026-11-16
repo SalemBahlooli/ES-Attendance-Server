@@ -47,6 +47,26 @@ async function init() {
     );
     CREATE INDEX IF NOT EXISTS attendance_time_idx ON attendance (punch_time);
     CREATE INDEX IF NOT EXISTS attendance_pin_idx ON attendance (pin);
+    -- Where a punch came from: adms (live from the device), file (USB / CSV) or lan
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'adms';
+    CREATE INDEX IF NOT EXISTS attendance_pin_time_idx ON attendance (pin, punch_time);
+
+    -- Device address on the office network, saved after a LAN pull
+    ALTER TABLE devices ADD COLUMN IF NOT EXISTS lan_ip TEXT;
+    ALTER TABLE devices ADD COLUMN IF NOT EXISTS lan_port INT;
+
+    CREATE TABLE IF NOT EXISTS imports (
+      id BIGSERIAL PRIMARY KEY,
+      source TEXT NOT NULL,
+      label TEXT,
+      sn TEXT,
+      total INT,
+      inserted INT,
+      duplicates INT,
+      names INT,
+      username TEXT,
+      created_at TIMESTAMPTZ DEFAULT now()
+    );
 
     CREATE TABLE IF NOT EXISTS commands (
       id BIGSERIAL PRIMARY KEY,
