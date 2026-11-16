@@ -94,7 +94,7 @@
       </div>
     </div>
 
-    <div class="ov-layout">
+    <div class="ov-top">
       <aside class="card calendar">
         <div class="cal-head">
           <button class="btn arrow" id="ovCalPrev" aria-label="Previous month">‹</button>
@@ -114,8 +114,7 @@
         </div>
         <div class="cal-foot small" id="ovCalFoot"></div>
       </aside>
-
-      <div class="ov-main">
+      <div class="ov-head">
         <div class="period-title"><h2 id="ovTitle"></h2><span class="muted small" id="ovSub"></span></div>
         <div class="stats" id="ovStats"></div>
 
@@ -127,45 +126,47 @@
           <div class="chart" id="ovMain"></div>
         </div>
 
-        <div class="chart-row">
-          <div class="card chart-card">
-            <div class="chart-head">
-              <div><h4>Arrival times</h4><div class="muted small">First punch per employee per day, in 30-minute slots</div></div>
-              <div class="legend"><span><i class="sw ok"></i>On time</span><span><i class="sw late"></i>Late</span></div>
-            </div>
-            <div class="chart" id="ovArrival"></div>
-          </div>
-          <div class="card chart-card">
-            <div class="chart-head">
-              <div><h4>Punches by hour</h4><div class="muted small">All punches in the period by hour of day</div></div>
-            </div>
-            <div class="chart" id="ovHours"></div>
-          </div>
-        </div>
-
-        <div class="card chart-card" id="ovMapCard">
+      </div>
+    </div>
+    <div class="ov-rest">
+      <div class="chart-row">
+        <div class="card chart-card">
           <div class="chart-head">
-            <div><h4>Attendance map</h4><div class="muted small">One square per employee per day. Hover for details, click to open the day.</div></div>
-            <div class="legend">
-              <span><i class="sw ok"></i>Present</span><span><i class="sw late"></i>Late</span><span><i class="sw leave"></i>On leave</span>
-              <span><i class="sw absent hatch"></i>Absent</span><span><i class="sw offday"></i>Day off</span>
-            </div>
+            <div><h4>Arrival times</h4><div class="muted small">First punch per employee per day, in 30-minute slots</div></div>
+            <div class="legend"><span><i class="sw ok"></i>On time</span><span><i class="sw late"></i>Late</span></div>
           </div>
-          <div class="matrix-wrap" id="ovMap"></div>
+          <div class="chart" id="ovArrival"></div>
         </div>
+        <div class="card chart-card">
+          <div class="chart-head">
+            <div><h4>Punches by hour</h4><div class="muted small">All punches in the period by hour of day</div></div>
+          </div>
+          <div class="chart" id="ovHours"></div>
+        </div>
+      </div>
 
-        <div class="card">
-          <div class="table-head">
-            <div class="seg" id="ovView">
-              <button data-view="employee" class="active">By employee</button>
-              <button data-view="day">Day by day</button>
-            </div>
-            <span class="spacer"></span>
-            <input type="search" id="ovSearch" placeholder="Search name or ID" aria-label="Search">
+      <div class="card chart-card" id="ovMapCard">
+        <div class="chart-head">
+          <div><h4>Attendance map</h4><div class="muted small">One square per employee per day. Hover for details, click to open the day.</div></div>
+          <div class="legend">
+            <span><i class="sw ok"></i>Present</span><span><i class="sw late"></i>Late</span><span><i class="sw leave"></i>On leave</span>
+            <span><i class="sw absent hatch"></i>Absent</span><span><i class="sw offday"></i>Day off</span>
           </div>
-          <div class="table-wrap">
-            <table><thead id="ovHead"></thead><tbody id="ovBody"></tbody></table>
+        </div>
+        <div class="matrix-wrap" id="ovMap"></div>
+      </div>
+
+      <div class="card">
+        <div class="table-head">
+          <div class="seg" id="ovView">
+            <button data-view="employee" class="active">By employee</button>
+            <button data-view="day">Day by day</button>
           </div>
+          <span class="spacer"></span>
+          <input type="search" id="ovSearch" placeholder="Search name or ID" aria-label="Search">
+        </div>
+        <div class="table-wrap">
+          <table><thead id="ovHead"></thead><tbody id="ovBody"></tbody></table>
         </div>
       </div>
     </div>
@@ -333,6 +334,7 @@
 
   <!-- Employees -->
   <section id="tab-employees" hidden>
+    <div id="empListView">
     <div class="toolbar">
       <input type="search" id="empSearch" placeholder="Search by name or ID">
       <label class="check"><input type="checkbox" id="empShowInactive"> Show inactive employees</label>
@@ -341,9 +343,56 @@
       If no start date is set, attendance is calculated from the employee's first recorded punch.</p>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>Start date</th><th>Active</th><th>Last punch</th></tr></thead>
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>Start date</th><th>Active</th><th>Last punch</th><th></th></tr></thead>
         <tbody id="empRows"></tbody>
       </table>
+    </div>
+    </div>
+
+    <!-- One employee: punches day by day -->
+    <div id="empDetailView" hidden>
+      <div class="emp-head">
+        <button class="btn" id="empBack">‹ All employees</button>
+        <div class="emp-title">
+          <h2 id="edName"></h2>
+          <div class="muted small" id="edInfo"></div>
+        </div>
+      </div>
+
+      <div class="filterbar card">
+        <div class="presets" id="edPresets">
+          <button data-preset="month">This month</button>
+          <button data-preset="lastmonth">Last month</button>
+          <button data-preset="last30">Last 30 days</button>
+          <button data-preset="last90">Last 3 months</button>
+          <button data-preset="timesheet">Timesheet period</button>
+        </div>
+        <div class="filters">
+          <div class="range-nav">
+            <button class="btn arrow" id="edPrev" aria-label="Previous period">‹</button>
+            <div class="range-field">
+              <input type="date" id="edFrom" aria-label="From">
+              <span class="muted">to</span>
+              <input type="date" id="edTo" aria-label="To">
+            </div>
+            <button class="btn arrow" id="edNext" aria-label="Next period">›</button>
+          </div>
+          <label class="check"><input type="checkbox" id="edHideOff"> Hide days off</label>
+          <span class="spacer"></span>
+          <button class="btn" id="edOverview" data-perm="report.view">Open in Overview</button>
+          <button class="btn primary" id="edExport">Export to Excel (CSV)</button>
+        </div>
+      </div>
+
+      <div class="stats" id="edStats"></div>
+
+      <div class="card table-wrap">
+        <table class="ed-table">
+          <thead><tr><th>Date</th><th>Day</th><th>Status</th><th>In</th><th>Out</th><th>Worked</th><th>Late</th><th>Early leave</th><th>All punches</th><th>Note</th></tr></thead>
+          <tbody id="edRows"></tbody>
+          <tfoot id="edFoot"></tfoot>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -476,5 +525,6 @@
 <script src="/static/app.js"></script>
 <script src="/static/overview.js"></script>
 <script src="/static/import.js"></script>
+<script src="/static/employee.js"></script>
 </body>
 </html>

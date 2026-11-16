@@ -540,6 +540,36 @@ api.get('/employees', need('employees.view', 'leaves.edit', 'punches.view'), h(a
 }));
 
 // Partial update: only the fields present in the body change
+// One employee, day by day: status, in/out, worked, late and every punch time
+api.get('/employees/:pin/days', need('employees.view', 'report.view'), h(async (req, res) => {
+  const { from, to } = req.query;
+  if (!rangeOk(from, to)) return res.status(400).json({ error: 'Pick a period of one year or less' });
+  const pin = req.params.pin;
+  const { rows: info } = await pool.query(
+    `SELECT e.pin, e.name, e.active, e.start_date, d.name AS department,
+            s.name AS shift, to_char(s.start_time, 'HH24:MI') AS shift_start, to_char(s.end_time, 'HH24:MI') AS shift_end
+     FROM employees e
+     LEFT JOIN departments d ON d.id = e.department_id
+     LEFT JOIN shifts s ON s.id = COALESCE(e.shift_id, d.shift_id, (SELECT id FROM shifts WHERE is_default LIMIT 1))
+     WHERE e.pin = $1`, [pin]);
+  if (!info.length) return res.status(404).json({ error: 'Employee not found' });
+  let days = (await compute(from, to)).days.filter((d) => d.pin === pin);
+  // Inactive employees are left out of compute(): show their punches grouped by date instead
+  if (!info[0].active) {
+    const { rows } = await pool.query(
+      `SELECT to_char(punch_time, 'YYYY-MM-DD') AS date, to_char(punch_time, 'FMDay') AS day_name,
+              MIN(punch_time) AS first_in, MAX(punch_time) AS last_out, COUNT(*)::int AS punches,
+              array_agg(to_char(punch_time, 'HH24:MI') ORDER BY punch_time) AS times
+       FROM attendance WHERE pin = $1 AND punch_time >= $2::date AND punch_time < $3::date + 1
+       GROUP BY 1, 2 ORDER BY 1`, [pin, from, to]);
+    days = rows.map((r) => ({
+      ...r, status: null, last_out: r.punches > 1 ? r.last_out : null,
+      worked_minutes: r.punches > 1 ? Math.floor((Date.parse(r.last_out.replace(' ', 'T')) - Date.parse(r.first_in.replace(' ', 'T'))) / 60000) : 0,
+    }));
+  }
+  res.json({ employee: info[0], days });
+}));
+
 api.put('/employees/:pin', need('employees.edit'), h(async (req, res) => {
   const b = req.body;
   const fields = {

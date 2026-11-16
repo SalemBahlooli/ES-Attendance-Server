@@ -289,6 +289,8 @@ $('holidayForm').onsubmit = async (e) => {
 
 /* ---------------- Employees ---------------- */
 async function loadEmployees() {
+  $('empDetailView').hidden = true;
+  $('empListView').hidden = false;
   await loadEmployeeList();
   renderEmployees();
 }
@@ -305,7 +307,9 @@ function renderEmployees() {
     <td><input type="date" data-field="start_date" value="${e.start_date || ''}"></td>
     <td><input type="checkbox" data-field="active" ${e.active ? 'checked' : ''}></td>
     <td class="num">${e.last_punch ? esc(e.last_punch.slice(0, 16)) : '—'}</td>
-  </tr>`).join('') : '<tr><td colspan="7" class="empty">No employees</td></tr>';
+    <td><button class="btn small" data-emp-open="${esc(e.pin)}">View punches</button></td>
+  </tr>`).join('') : '<tr><td colspan="8" class="empty">No employees</td></tr>';
+  document.querySelectorAll('[data-emp-open]').forEach((b) => (b.onclick = () => openEmployee(b.dataset.empOpen)));
 
   if (!can('employees.edit')) document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.disabled = true));
   document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.onchange = async () => {
