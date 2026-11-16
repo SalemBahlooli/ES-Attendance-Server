@@ -51,6 +51,14 @@ async function init() {
     ALTER TABLE attendance ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'adms';
     CREATE INDEX IF NOT EXISTS attendance_pin_time_idx ON attendance (pin, punch_time);
 
+    -- Manual corrections. A deleted or edited punch is kept (deleted_at set) so the device
+    -- cannot send it back, and so there is a record of what changed.
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS created_by TEXT;
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS note TEXT;
+    ALTER TABLE attendance ADD COLUMN IF NOT EXISTS replaces_id BIGINT;
+
     -- Device address on the office network, saved after a LAN pull
     ALTER TABLE devices ADD COLUMN IF NOT EXISTS lan_ip TEXT;
     ALTER TABLE devices ADD COLUMN IF NOT EXISTS lan_port INT;

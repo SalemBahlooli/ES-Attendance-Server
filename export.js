@@ -67,7 +67,7 @@ async function buildWorkbook(from, to, departmentId) {
   });
 
   const params = [from, to];
-  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
+  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1 AND a.deleted_at IS NULL';
   if (departmentId) { params.push(departmentId); where += ' AND e.department_id = $3'; }
   const { rows: punches } = await pool.query(
     `SELECT a.pin, e.name, to_char(a.punch_time, 'YYYY-MM-DD') AS day,

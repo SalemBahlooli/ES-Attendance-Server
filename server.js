@@ -272,7 +272,7 @@ function punchFilter(q) {
   const { from, to } = q;
   if (!isDate(from) || !isDate(to)) return null;
   const params = [from, to];
-  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
+  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1 AND a.deleted_at IS NULL';
   if (q.pin) { params.push(String(q.pin)); where += ` AND a.pin = $${params.length}`; }
   if (intOrNull(q.department_id)) {
     params.push(intOrNull(q.department_id));
@@ -304,7 +304,7 @@ api.get('/hours', need('report.view'), h(async (req, res) => {
 api.get('/bounds', need('report.view', 'attendance.view'), h(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT to_char(MIN(punch_time), 'YYYY-MM-DD') AS first, to_char(MAX(punch_time), 'YYYY-MM-DD') AS last
-     FROM attendance`);
+     FROM attendance WHERE deleted_at IS NULL`);
   res.json(rows[0]);
 }));
 
@@ -515,10 +515,10 @@ api.get('/punches', need('punches.view'), h(async (req, res) => {
   const { from, to, pin } = req.query;
   if (!isDate(from) || !isDate(to)) return res.status(400).json({ error: 'bad date' });
   const params = [from, to];
-  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
+  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1 AND a.deleted_at IS NULL';
   if (pin) { params.push(pin); where += ` AND a.pin = $${params.length}`; }
   const { rows } = await pool.query(
-    `SELECT a.id, a.pin, e.name, a.punch_time
+    `SELECT a.id, a.pin, e.name, a.punch_time, a.source = 'manual' AS manual
      FROM attendance a
      LEFT JOIN employees e ON e.pin = a.pin
      WHERE ${where} ORDER BY a.punch_time DESC LIMIT 5000`,
@@ -532,7 +532,7 @@ api.get('/employees', need('employees.view', 'leaves.edit', 'punches.view'), h(a
   const { rows } = await pool.query(
     `SELECT e.pin, e.name, e.department_id, e.shift_id, e.active, e.start_date,
             MAX(a.punch_time) AS last_punch, COUNT(a.id)::int AS total
-     FROM employees e LEFT JOIN attendance a ON a.pin = e.pin
+     FROM employees e LEFT JOIN attendance a ON a.pin = e.pin AND a.deleted_at IS NULL
      GROUP BY e.pin
      ORDER BY CASE WHEN e.pin ~ '^[0-9]+$' THEN e.pin::bigint END NULLS LAST, e.pin`
   );
@@ -540,6 +540,83 @@ api.get('/employees', need('employees.view', 'leaves.edit', 'punches.view'), h(a
 }));
 
 // Partial update: only the fields present in the body change
+/* Manual punch corrections */
+
+const isStamp = (s) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(s || '');
+const stamp = (s) => (s.length === 16 ? s + ':00' : s);
+
+// Punches of one employee on one date, including where each came from
+api.get('/employees/:pin/punches', need('punches.edit', 'punches.view'), h(async (req, res) => {
+  if (!isDate(req.query.date)) return res.status(400).json({ error: 'bad date' });
+  const { rows } = await pool.query(
+    `SELECT a.id, to_char(a.punch_time, 'YYYY-MM-DD HH24:MI:SS') AS time, a.source, a.sn, a.note, a.created_by,
+            d.name AS device_name
+     FROM attendance a LEFT JOIN devices d ON d.sn = a.sn
+     WHERE a.pin = $1 AND a.punch_time >= $2::date AND a.punch_time < $2::date + 1 AND a.deleted_at IS NULL
+     ORDER BY a.punch_time`, [req.params.pin, req.query.date]);
+  res.json(rows);
+}));
+
+async function punchExists(pin, time, exceptId) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM attendance WHERE pin = $1 AND punch_time = $2 AND deleted_at IS NULL AND id <> $3`,
+    [pin, time, exceptId || 0]);
+  return rows.length > 0;
+}
+
+async function insertManual(req, pin, time, replacesId) {
+  const { rows } = await pool.query(
+    `INSERT INTO attendance (sn, pin, punch_time, source, created_by, note, replaces_id)
+     VALUES ('MANUAL', $1, $2, 'manual', $3, $4, $5)
+     ON CONFLICT (sn, pin, punch_time) DO UPDATE SET deleted_at = NULL, deleted_by = NULL,
+       created_by = EXCLUDED.created_by, note = EXCLUDED.note, replaces_id = EXCLUDED.replaces_id
+     RETURNING id`,
+    [pin, time, req.user.username, text(req.body.note), replacesId || null]);
+  return rows[0].id;
+}
+
+api.post('/punches', need('punches.edit'), h(async (req, res) => {
+  const pin = text(req.body.pin);
+  const time = String(req.body.time || '');
+  if (!pin || !isStamp(time)) return res.status(400).json({ error: 'Enter the employee and the date and time' });
+  if (await punchExists(pin, stamp(time))) return res.status(400).json({ error: 'There is already a punch at this time' });
+  await pool.query('INSERT INTO employees (pin) VALUES ($1) ON CONFLICT DO NOTHING', [pin]);
+  const id = await insertManual(req, pin, stamp(time));
+  await audit(req, 'Add punch', `${await employeeLabel(pin)}: ${time.slice(0, 16)}${text(req.body.note) ? ' - ' + text(req.body.note) : ''}`);
+  res.json({ ok: true, id });
+}));
+
+// Editing keeps the original (marked deleted) and adds a corrected manual punch
+api.put('/punches/:id', need('punches.edit'), h(async (req, res) => {
+  const time = String(req.body.time || '');
+  if (!isStamp(time)) return res.status(400).json({ error: 'Enter a valid date and time' });
+  const { rows } = await pool.query(
+    `SELECT id, pin, to_char(punch_time, 'YYYY-MM-DD HH24:MI:SS') AS time FROM attendance WHERE id = $1 AND deleted_at IS NULL`,
+    [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'This punch no longer exists' });
+  const old = rows[0];
+  if (old.time === stamp(time)) return res.json({ ok: true, id: old.id });
+  if (await punchExists(old.pin, stamp(time), old.id)) return res.status(400).json({ error: 'There is already a punch at this time' });
+  await pool.query('UPDATE attendance SET deleted_at = now(), deleted_by = $2 WHERE id = $1', [old.id, req.user.username]);
+  const id = await insertManual(req, old.pin, stamp(time), old.id);
+  await audit(req, 'Edit punch',
+    `${await employeeLabel(old.pin)}: ${old.time.slice(0, 16)} → ${time.slice(0, 16)}${text(req.body.note) ? ' - ' + text(req.body.note) : ''}`);
+  res.json({ ok: true, id });
+}));
+
+api.delete('/punches/:id', need('punches.edit'), h(async (req, res) => {
+  const { rows } = await pool.query(
+    `UPDATE attendance SET deleted_at = now(), deleted_by = $2, note = COALESCE($3, note)
+     WHERE id = $1 AND deleted_at IS NULL
+     RETURNING pin, to_char(punch_time, 'YYYY-MM-DD HH24:MI') AS time`,
+    [req.params.id, req.user.username, text(req.body && req.body.note)]);
+  if (rows.length) {
+    await audit(req, 'Delete punch',
+      `${await employeeLabel(rows[0].pin)}: ${rows[0].time}${text(req.body && req.body.note) ? ' - ' + text(req.body.note) : ''}`);
+  }
+  res.json({ ok: true });
+}));
+
 // One employee, day by day: status, in/out, worked, late and every punch time
 api.get('/employees/:pin/days', need('employees.view', 'report.view'), h(async (req, res) => {
   const { from, to } = req.query;
@@ -560,7 +637,7 @@ api.get('/employees/:pin/days', need('employees.view', 'report.view'), h(async (
       `SELECT to_char(punch_time, 'YYYY-MM-DD') AS date, to_char(punch_time, 'FMDay') AS day_name,
               MIN(punch_time) AS first_in, MAX(punch_time) AS last_out, COUNT(*)::int AS punches,
               array_agg(to_char(punch_time, 'HH24:MI') ORDER BY punch_time) AS times
-       FROM attendance WHERE pin = $1 AND punch_time >= $2::date AND punch_time < $3::date + 1
+       FROM attendance WHERE pin = $1 AND punch_time >= $2::date AND punch_time < $3::date + 1 AND deleted_at IS NULL
        GROUP BY 1, 2 ORDER BY 1`, [pin, from, to]);
     days = rows.map((r) => ({
       ...r, status: null, last_out: r.punches > 1 ? r.last_out : null,
@@ -595,7 +672,7 @@ api.put('/employees/:pin', need('employees.edit'), h(async (req, res) => {
 
 api.get('/devices', need('devices.view'), h(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT d.*, (SELECT COUNT(*)::int FROM attendance a WHERE a.sn = d.sn) AS total,
+    `SELECT d.*, (SELECT COUNT(*)::int FROM attendance a WHERE a.sn = d.sn AND a.deleted_at IS NULL) AS total,
             (SELECT COUNT(*)::int FROM commands c WHERE c.sn = d.sn AND c.status IN ('pending','sent')) AS pending
      FROM devices d ORDER BY last_seen DESC`
   );

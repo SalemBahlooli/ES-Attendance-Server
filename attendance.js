@@ -52,7 +52,7 @@ async function compute(from, to) {
     pool.query(
       `SELECT e.pin, e.name, e.department_id, d.name AS department,
               -- Without a start date, days before the employee's first punch are not counted
-              COALESCE(e.start_date, (SELECT MIN(punch_time)::date FROM attendance a WHERE a.pin = e.pin)) AS start_date,
+              COALESCE(e.start_date, (SELECT MIN(punch_time)::date FROM attendance a WHERE a.pin = e.pin AND a.deleted_at IS NULL)) AS start_date,
               COALESCE(e.shift_id, d.shift_id) AS shift_id
        FROM employees e LEFT JOIN departments d ON d.id = e.department_id
        WHERE e.active
@@ -61,8 +61,8 @@ async function compute(from, to) {
     pool.query('SELECT * FROM holidays WHERE end_date >= $1 AND start_date <= $2', [from, to]),
     pool.query('SELECT * FROM leaves WHERE end_date >= $1 AND start_date <= $2', [from, to]),
     pool.query(
-      `SELECT pin, punch_time FROM attendance
-       WHERE punch_time >= $1::date - 1 AND punch_time < $2::date + 2
+      `SELECT pin, punch_time, source FROM attendance
+       WHERE punch_time >= $1::date - 1 AND punch_time < $2::date + 2 AND deleted_at IS NULL
        ORDER BY punch_time`,
       [from, to]
     ),
@@ -72,9 +72,11 @@ async function compute(from, to) {
   const defaultShift = shiftsRes.rows.find((s) => s.is_default) || shiftsRes.rows[0];
 
   const punchesByPin = new Map();
+  const manual = new Set(); // "pin|ms" of punches added or corrected by hand
   for (const p of punchRes.rows) {
     if (!punchesByPin.has(p.pin)) punchesByPin.set(p.pin, []);
     punchesByPin.get(p.pin).push(tsMs(p.punch_time));
+    if (p.source === 'manual') manual.add(p.pin + '|' + tsMs(p.punch_time));
   }
 
   const now = localNow();
@@ -111,7 +113,8 @@ async function compute(from, to) {
         date, day_name: DAY_NAMES[dow], pin: emp.pin, name: emp.name,
         department_id: emp.department_id, department: emp.department,
         shift: shift.name, shift_start: shift.start_time.slice(0, 5), shift_end: shift.end_time.slice(0, 5),
-        first_in: null, last_out: null, punches: ps.length, times: ps.map((p) => fmtTs(p).slice(11, 16)), worked_minutes: 0,
+        first_in: null, last_out: null, punches: ps.length, times: ps.map((p) => fmtTs(p).slice(11, 16)),
+        manual_times: ps.filter((p) => manual.has(emp.pin + '|' + p)).map((p) => fmtTs(p).slice(11, 16)), worked_minutes: 0,
         late_minutes: 0, early_minutes: 0, missing_out: false, status: null, note: null,
       };
 

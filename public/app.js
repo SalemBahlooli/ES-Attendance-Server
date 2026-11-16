@@ -150,9 +150,12 @@ async function loadToday() {
     <td class="num ${r.late_minutes ? 'warn' : ''}">${mins(r.late_minutes)}</td>
     <td class="num ${r.early_minutes ? 'warn' : ''}">${mins(r.early_minutes)}</td>
     <td>${pill(r.status)}${r.note ? ` <span class="muted small">${esc(r.note)}</span>` : ''}</td>
-    <td>${r.status === 'absent' && can('leaves.edit') ? `<button class="btn small" data-leave="${esc(r.pin)}" data-date="${r.date}">Add leave</button>` : ''}</td>
+    <td><div class="row-actions">${can('punches.edit') ? `<button class="btn small" data-fix="${esc(r.pin)}" data-date="${r.date}" data-name="${esc(r.name || '')}">${r.punches ? 'Edit punches' : 'Add punch'}</button>` : ''}
+      ${r.status === 'absent' && can('leaves.edit') ? `<button class="btn small" data-leave="${esc(r.pin)}" data-date="${r.date}">Add leave</button>` : ''}</div></td>
   </tr>`).join('') : '<tr><td colspan="11" class="empty">No employees yet. They appear here after their first punch on the device.</td></tr>';
 
+  document.querySelectorAll('#todayRows [data-fix]').forEach((b) => (b.onclick = () =>
+    openPunchEditor(b.dataset.fix, b.dataset.date, b.dataset.name, loadToday)));
   document.querySelectorAll('[data-leave]').forEach((b) => (b.onclick = () => {
     showTab('leaves');
     $('leavePin').value = b.dataset.leave;
@@ -336,7 +339,7 @@ async function loadLog() {
     <td class="num">${esc(r.pin)}</td>
     <td>${nameCell(r.name)}</td>
     <td class="num">${r.punch_time.slice(0, 10)}</td>
-    <td class="num">${r.punch_time.slice(11, 19)}</td></tr>`).join('')
+    <td class="num">${r.punch_time.slice(11, 19)}${r.manual ? ' <span class="pill info" title="Added or corrected by hand">Manual</span>' : ''}</td></tr>`).join('')
     : '<tr><td colspan="4" class="empty">No punches in this period</td></tr>';
 }
 $('loadLog').onclick = loadLog;

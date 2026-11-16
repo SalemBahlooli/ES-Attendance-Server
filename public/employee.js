@@ -115,7 +115,9 @@ function edRender() {
   const list = $('edHideOff').checked ? days.filter((r) => !isOff(r) || r.punches) : days;
   $('edRows').innerHTML = list.length ? list.map((r) => {
     const times = r.times || [];
-    const chips = times.map((t, i) => `<span class="time-chip ${i === 0 ? 'in' : i === times.length - 1 ? 'out' : ''}">${t}</span>`).join('');
+    const manual = r.manual_times || [];
+    const chips = times.map((t, i) => `<span class="time-chip ${i === 0 ? 'in' : i === times.length - 1 ? 'out' : ''} ${manual.includes(t) ? 'manual' : ''}"
+      ${manual.includes(t) ? 'title="Added or corrected by hand"' : ''}>${t}</span>`).join('');
     return `<tr class="${isOff(r) && !r.punches ? 'off' : ''} ${r.date === meta.today ? 'today' : ''}">
       <td class="num">${niceDate(r.date, { year: true })}</td>
       <td>${esc((r.day_name || '').slice(0, 3))}</td>
@@ -126,14 +128,18 @@ function edRender() {
       <td class="num ${r.late_minutes ? 'warn' : ''}">${mins(r.late_minutes)}</td>
       <td class="num ${r.early_minutes ? 'warn' : ''}">${mins(r.early_minutes)}</td>
       <td class="wrap-cell"><div class="times">${chips || '<span class="muted">—</span>'}</div></td>
-      <td class="muted">${esc(r.note) || ''}</td></tr>`;
-  }).join('') : '<tr><td colspan="10" class="empty">No days in this period</td></tr>';
+      <td class="muted">${esc(r.note) || ''}</td>
+      ${can('punches.edit') ? `<td><button class="btn small" data-edit-day="${r.date}">${r.punches ? 'Edit' : 'Add punch'}</button></td>` : ''}</tr>`;
+  }).join('') : '<tr><td colspan="11" class="empty">No days in this period</td></tr>';
+  $('edRows').querySelectorAll('[data-edit-day]').forEach((b) => {
+    b.onclick = () => openPunchEditor(e.pin, b.dataset.editDay, e.name, loadEmployeeDays);
+  });
   $('edFoot').innerHTML = list.length ? `<tr>
     <td colspan="5">Total · ${counted.length} days</td>
     <td class="num">${fmtDur(workedMin)}</td>
     <td class="num">${lateMin ? fmtDur(lateMin) : '—'}</td>
     <td class="num">${earlyMin ? fmtDur(earlyMin) : '—'}</td>
-    <td class="num">${punches} punches</td><td></td></tr>` : '';
+    <td class="num">${punches} punches</td><td></td>${can('punches.edit') ? '<td></td>' : ''}</tr>` : '';
 }
 
 // Excel opens UTF-8 CSV correctly with the BOM

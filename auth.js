@@ -10,6 +10,7 @@ const PERMISSIONS = [
   { key: 'report.view', group: 'Attendance', label: 'View reports' },
   { key: 'report.export', group: 'Attendance', label: 'Export Excel and timesheet' },
   { key: 'punches.view', group: 'Attendance', label: 'View punch log' },
+  { key: 'punches.edit', group: 'Attendance', label: 'Add, edit and delete punches' },
   { key: 'leaves.view', group: 'Leaves', label: 'View leaves and holidays' },
   { key: 'leaves.edit', group: 'Leaves', label: 'Add and delete employee leaves' },
   { key: 'holidays.edit', group: 'Leaves', label: 'Add and delete public holidays' },
