@@ -74,7 +74,7 @@ function impBranchPreview(r) {
       <dt>Employees</dt><dd>${r.employees.length}${newEmps ? ` (${newEmps} new here)` : ' (all already here)'}</dd>
       <dt>Punches</dt><dd>${r.punches}</dd>
       <dt>New punches</dt><dd><b>${fresh}</b></dd>
-      ${r.removed ? `<dt>Removed there</dt><dd>${r.removed} (removed here too, if present)</dd>` : ''}
+      ${r.removed ? `<dt>No longer in the file</dt><dd>${r.removed} punches from an earlier file (they will be taken out)</dd>` : ''}
       ${r.leaves ? `<dt>Leaves</dt><dd>${r.leaves}</dd>` : ''}
     </dl>
     <details><summary>Employees in this file</summary>
@@ -103,7 +103,7 @@ async function impCommit() {
     impText = null;
     $('impFile').value = '';
     impPreview(`<div class="result ok"><strong>Imported from ${esc(r.branchName)}</strong>
-      <span>${r.inserted} new punches${r.duplicates ? ` (${r.duplicates} were already here)` : ''}, ${r.newEmployees} new employees${r.removed ? `, ${r.removed} punches removed` : ''}${r.leaves ? `, ${r.leaves} leaves` : ''}.</span>
+      <span>${r.inserted} new punches${r.duplicates ? ` (${r.duplicates} were already here)` : ''}, ${r.newEmployees} new employees${r.removed ? `, ${r.removed} old punches taken out` : ''}${r.leaves ? `, ${r.leaves} leaves` : ''}.</span>
       ${canTab('overview') ? '<div class="actions"><button class="btn small" id="impView">View these days</button></div>' : ''}</div>`);
     if ($('impView')) $('impView').onclick = () => {
       const last = r.period.to < meta.today ? r.period.to : meta.today;

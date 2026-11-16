@@ -133,6 +133,8 @@ async function init() {
       created_at TIMESTAMPTZ DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS leaves_dates_idx ON leaves (start_date, end_date);
+    -- Set on leaves copied from another branch's file, so a newer file can update them
+    ALTER TABLE leaves ADD COLUMN IF NOT EXISTS source TEXT;
 
     -- Dashboard accounts. permissions holds keys from PERMISSIONS in auth.js.
     CREATE TABLE IF NOT EXISTS roles (
