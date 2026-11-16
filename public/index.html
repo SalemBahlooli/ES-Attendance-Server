@@ -15,55 +15,142 @@
 </header>
 
 <nav class="tabs">
-  <button data-tab="today" class="active">Daily Attendance</button>
-  <button data-tab="log">Punch Log</button>
+  <button data-tab="attendance" class="active">Attendance</button>
   <button data-tab="employees">Employees</button>
+  <button data-tab="import">Import Data</button>
   <button data-tab="devices">Devices</button>
 </nav>
 
 <main>
-  <!-- Daily attendance -->
-  <section id="tab-today">
-    <div class="toolbar">
-      <input type="date" id="day">
-      <button class="btn" id="prevDay">Previous Day</button>
-      <button class="btn" id="todayBtn">Today</button>
-      <span class="spacer"></span>
-      <span class="muted">Work start: <span id="workStart" class="num"></span></span>
+  <!-- ============ Attendance ============ -->
+  <section id="tab-attendance">
+    <div class="filterbar card">
+      <div class="presets" id="presets">
+        <button data-preset="today">Today</button>
+        <button data-preset="yesterday">Yesterday</button>
+        <button data-preset="week">This week</button>
+        <button data-preset="last7">Last 7 days</button>
+        <button data-preset="month">This month</button>
+        <button data-preset="lastmonth">Last month</button>
+        <button data-preset="last30">Last 30 days</button>
+      </div>
+      <div class="filters">
+        <div class="range-nav">
+          <button class="btn icon" id="rangePrev" title="Previous period" aria-label="Previous period">‹</button>
+          <label class="range-field">
+            <input type="date" id="from" aria-label="From">
+            <span class="muted">to</span>
+            <input type="date" id="to" aria-label="To">
+          </label>
+          <button class="btn icon" id="rangeNext" title="Next period" aria-label="Next period">›</button>
+        </div>
+        <select id="pinFilter" aria-label="Employee"><option value="">All employees</option></select>
+        <select id="snFilter" aria-label="Device"><option value="">All devices</option></select>
+        <span class="spacer"></span>
+        <span class="muted small">Work start <span id="workStart" class="num"></span></span>
+        <button class="btn primary" id="exportBtn">Export to Excel</button>
+      </div>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="label">Present</div><div class="value num" id="sPresent">0</div></div>
-      <div class="stat"><div class="label">Late</div><div class="value num" id="sLate">0</div></div>
-      <div class="stat"><div class="label">Absent</div><div class="value num" id="sAbsent">0</div></div>
-      <div class="stat"><div class="label">Total Employees</div><div class="value num" id="sTotal">0</div></div>
-    </div>
-    <div class="card table-wrap">
-      <table>
-        <thead><tr><th>ID</th><th>Name</th><th>First In</th><th>Last Out</th><th>Duration</th><th>Punches</th><th>Status</th></tr></thead>
-        <tbody id="todayRows"></tbody>
-      </table>
+
+    <div class="att-layout">
+      <!-- Calendar -->
+      <aside class="card calendar" id="calendar">
+        <div class="cal-head">
+          <button class="btn icon" id="calPrev" aria-label="Previous month">‹</button>
+          <strong id="calTitle"></strong>
+          <button class="btn icon" id="calNext" aria-label="Next month">›</button>
+        </div>
+        <div class="seg" id="pickMode">
+          <button data-mode="day" class="active">Pick a day</button>
+          <button data-mode="range">Pick a range</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-hint muted small" id="calHint">Days with punches are shaded. Click a day to open it.</div>
+        <div class="cal-legend small">
+          <span class="muted">Fewer</span>
+          <i class="lv lv1"></i><i class="lv lv2"></i><i class="lv lv3"></i><i class="lv lv4"></i><i class="lv lv5"></i>
+          <span class="muted">More employees</span>
+        </div>
+        <div class="cal-foot small" id="calFoot"></div>
+      </aside>
+
+      <div class="att-main">
+        <div class="period-title">
+          <h2 id="periodTitle"></h2>
+          <span class="muted small" id="periodSub"></span>
+        </div>
+        <div class="stats" id="stats"></div>
+
+        <div class="card chart-card" id="chartMainCard">
+          <div class="chart-head">
+            <div>
+              <h3 id="chartMainTitle"></h3>
+              <div class="muted small" id="chartMainSub"></div>
+            </div>
+            <div class="legend" id="chartMainLegend"></div>
+          </div>
+          <div class="chart" id="chartMain"></div>
+        </div>
+
+        <div class="chart-row">
+          <div class="card chart-card">
+            <div class="chart-head">
+              <div>
+                <h3>Arrival times</h3>
+                <div class="muted small">First punch of each employee per day, in 30-minute slots</div>
+              </div>
+              <div class="legend">
+                <span><i class="sw ok"></i>On time</span><span><i class="sw late"></i>Late</span>
+              </div>
+            </div>
+            <div class="chart" id="chartArrival"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="chart-head">
+              <div>
+                <h3>Punches by hour</h3>
+                <div class="muted small">All punches in the period by hour of day</div>
+              </div>
+            </div>
+            <div class="chart" id="chartHours"></div>
+          </div>
+        </div>
+
+        <div class="card chart-card" id="matrixCard">
+          <div class="chart-head">
+            <div>
+              <h3>Attendance map</h3>
+              <div class="muted small">Each square is one employee on one day. Hover for times, click to open that day.</div>
+            </div>
+            <div class="legend">
+              <span><i class="sw ok"></i>On time</span><span><i class="sw late"></i>Late</span><span><i class="sw none"></i>No punch</span>
+            </div>
+          </div>
+          <div class="matrix-wrap" id="matrix"></div>
+        </div>
+
+        <div class="card">
+          <div class="table-head">
+            <div class="seg" id="viewMode">
+              <button data-view="employee" class="active">By employee</button>
+              <button data-view="day">Day by day</button>
+              <button data-view="punches">All punches</button>
+            </div>
+            <span class="spacer"></span>
+            <input type="search" id="tableSearch" placeholder="Search name or ID" aria-label="Search">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead id="tableHead"></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- Punch log -->
-  <section id="tab-log" hidden>
-    <div class="toolbar">
-      <label>From <input type="date" id="from"></label>
-      <label>To <input type="date" id="to"></label>
-      <select id="pinFilter"><option value="">All employees</option></select>
-      <button class="btn" id="loadLog">Show</button>
-      <span class="spacer"></span>
-      <button class="btn primary" id="exportBtn">Export to Excel</button>
-    </div>
-    <div class="card table-wrap">
-      <table>
-        <thead><tr><th>ID</th><th>Name</th><th>Date</th><th>Time</th><th>Verify Method</th><th>Device</th></tr></thead>
-        <tbody id="logRows"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Employees -->
+  <!-- ============ Employees ============ -->
   <section id="tab-employees" hidden>
     <div class="toolbar">
       <span class="muted">Type the employee name next to their ID. It saves automatically when you leave the field.</span>
@@ -76,171 +163,79 @@
     </div>
   </section>
 
-  <!-- Devices -->
+  <!-- ============ Import ============ -->
+  <section id="tab-import" hidden>
+    <div class="import-grid">
+      <div class="card pad">
+        <h3>From USB or a file</h3>
+        <ol class="steps muted">
+          <li>On the device: <b>Menu → PenDrive Mng</b> (or <b>USB Manager</b>) <b>→ Download AttLog</b>.</li>
+          <li>Plug the USB stick into this computer and choose the file, usually <span class="code">1_attlog.dat</span> or <span class="code">&lt;serial&gt;_attlog.dat</span>.</li>
+          <li>CSV or TXT files also work, for example an export from ZKTeco software saved as CSV. They need an employee ID column and a date/time column.</li>
+        </ol>
+        <label class="drop" id="drop">
+          <input type="file" id="fileInput" accept=".dat,.txt,.csv,.tsv,.log,text/plain,text/csv" hidden>
+          <strong>Drop the file here</strong>
+          <span class="muted">or click to choose it</span>
+        </label>
+        <div class="form-row">
+          <label>Save under device
+            <select id="importSn"></select>
+          </label>
+          <label>Date format in CSV
+            <select id="dateOrder">
+              <option value="dmy">Day/Month/Year</option>
+              <option value="mdy">Month/Day/Year</option>
+            </select>
+          </label>
+        </div>
+        <div id="preview"></div>
+      </div>
+
+      <div class="card pad">
+        <h3>From the device over LAN</h3>
+        <p class="muted">Reads all punches and employee names straight from the device on port 4370.
+          This only works when the server can reach the device's IP address (server running on the same network).</p>
+        <div class="form-row">
+          <label>Device IP <input id="lanIp" placeholder="192.168.1.201" inputmode="decimal"></label>
+          <label class="narrow">Port <input id="lanPort" value="4370" inputmode="numeric"></label>
+        </div>
+        <div class="actions">
+          <button class="btn" id="lanTest">Test connection</button>
+          <button class="btn primary" id="lanPull">Pull punches now</button>
+        </div>
+        <div id="lanResult"></div>
+
+        <h3 class="mt">Server in the cloud? Use the LAN bridge</h3>
+        <p class="muted">Railway cannot see your office network. Run this small program on any office PC that is on the same network as the device.
+          It reads the device over the LAN and sends new punches to this dashboard.</p>
+        <ol class="steps muted">
+          <li>Install <a href="https://nodejs.org" target="_blank" rel="noopener">Node.js</a> on the PC and download this repository.</li>
+          <li>In the repository folder, open a terminal (Command Prompt) and run <span class="code">npm install</span> once.</li>
+          <li>Then run (repeats every 5 minutes; keep the window open):</li>
+        </ol>
+        <div class="codeblock"><code id="bridgeCmd"></code><button class="btn small" id="copyBridge">Copy</button></div>
+      </div>
+
+      <div class="card table-wrap span2">
+        <div class="table-head"><h3>Import history</h3></div>
+        <table>
+          <thead><tr><th>When</th><th>Source</th><th>File / address</th><th>Device</th><th>Records</th><th>New</th><th>Already saved</th><th>Names added</th></tr></thead>
+          <tbody id="importRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Devices ============ -->
   <section id="tab-devices" hidden>
     <div class="device-grid" id="deviceList"></div>
   </section>
 </main>
 
+<div class="tooltip" id="tip" role="tooltip"></div>
 <div class="toast" id="toast"></div>
 
-<script>
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const VERIFY = { 0: 'Password', 1: 'Fingerprint', 2: 'Card', 3: 'Password', 4: 'Card', 15: 'Face', 25: 'Palm' };
-let workStart = '08:00';
-
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
-}
-
-async function api(url, opts = {}) {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
-  if (res.status === 401) { location.href = '/login'; throw new Error('unauthorized'); }
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-function localDate(d = new Date()) {
-  const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return z.toISOString().slice(0, 10);
-}
-const hm = (ts) => ts ? ts.slice(11, 16) : '—';
-function duration(a, b) {
-  if (!a || !b || a === b) return '—';
-  const mins = Math.round((new Date(b.replace(' ', 'T')) - new Date(a.replace(' ', 'T'))) / 60000);
-  return `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`;
-}
-
-/* Tabs */
-document.querySelectorAll('nav.tabs button').forEach((b) => {
-  b.onclick = () => {
-    document.querySelectorAll('nav.tabs button').forEach((x) => x.classList.toggle('active', x === b));
-    document.querySelectorAll('main section').forEach((s) => (s.hidden = s.id !== 'tab-' + b.dataset.tab));
-    ({ today: loadToday, log: loadLog, employees: loadEmployees, devices: loadDevices })[b.dataset.tab]();
-  };
-});
-
-/* Daily */
-async function loadToday() {
-  const rows = await api('/api/summary?date=' + $('day').value);
-  let present = 0, late = 0, absent = 0;
-  $('todayRows').innerHTML = rows.length ? rows.map((r) => {
-    let status;
-    if (!r.first_in) { absent++; status = '<span class="pill absent">Absent</span>'; }
-    else if (hm(r.first_in) > workStart) { present++; late++; status = '<span class="pill late">Late</span>'; }
-    else { present++; status = '<span class="pill ok">Present</span>'; }
-    return `<tr>
-      <td class="num">${esc(r.pin)}</td>
-      <td>${esc(r.name) || '<span class="muted">No name</span>'}</td>
-      <td class="num">${hm(r.first_in)}</td>
-      <td class="num">${r.punches > 1 ? hm(r.last_out) : '—'}</td>
-      <td class="num">${duration(r.first_in, r.last_out)}</td>
-      <td class="num">${r.punches}</td>
-      <td>${status}</td></tr>`;
-  }).join('') : '<tr><td colspan="7" class="empty">No employees yet. They will appear here as soon as someone punches on the device.</td></tr>';
-  $('sPresent').textContent = present;
-  $('sLate').textContent = late;
-  $('sAbsent').textContent = absent;
-  $('sTotal').textContent = rows.length;
-}
-$('day').onchange = loadToday;
-$('todayBtn').onclick = () => { $('day').value = localDate(); loadToday(); };
-$('prevDay').onclick = () => {
-  const d = new Date($('day').value + 'T12:00:00');
-  d.setDate(d.getDate() - 1);
-  $('day').value = localDate(d);
-  loadToday();
-};
-
-/* Log */
-async function loadLog() {
-  const pin = $('pinFilter').value;
-  const rows = await api(`/api/punches?from=${$('from').value}&to=${$('to').value}${pin ? '&pin=' + encodeURIComponent(pin) : ''}`);
-  $('logRows').innerHTML = rows.length ? rows.map((r) => `<tr>
-    <td class="num">${esc(r.pin)}</td>
-    <td>${esc(r.name) || '<span class="muted">No name</span>'}</td>
-    <td class="num">${r.punch_time.slice(0, 10)}</td>
-    <td class="num">${r.punch_time.slice(11, 19)}</td>
-    <td>${VERIFY[r.verify] || r.verify}</td>
-    <td>${esc(r.device_name || r.sn)}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No punches in this period</td></tr>';
-}
-$('loadLog').onclick = loadLog;
-$('exportBtn').onclick = () => { location.href = `/export.csv?from=${$('from').value}&to=${$('to').value}`; };
-
-/* Employees */
-async function loadEmployees() {
-  const rows = await api('/api/employees');
-  $('pinFilter').innerHTML = '<option value="">All employees</option>' +
-    rows.map((r) => `<option value="${esc(r.pin)}">${esc(r.pin)} - ${esc(r.name || 'No name')}</option>`).join('');
-  $('empRows').innerHTML = rows.length ? rows.map((r) => `<tr>
-    <td class="num">${esc(r.pin)}</td>
-    <td><input class="name-input" data-pin="${esc(r.pin)}" value="${esc(r.name)}" placeholder="Enter name"></td>
-    <td class="num">${r.last_punch ? esc(r.last_punch.slice(0, 16)) : '—'}</td>
-    <td class="num">${r.total}</td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty">No employees yet</td></tr>';
-  document.querySelectorAll('.name-input').forEach((inp) => {
-    inp.dataset.orig = inp.value;
-    inp.onchange = async () => {
-      await api('/api/employees/' + encodeURIComponent(inp.dataset.pin), { method: 'PUT', body: JSON.stringify({ name: inp.value }) });
-      toast('Name saved');
-    };
-  });
-}
-
-/* Devices */
-async function loadDevices() {
-  const rows = await api('/api/devices');
-  $('deviceList').innerHTML = rows.length ? rows.map((d) => {
-    const online = Date.now() - new Date(d.last_seen).getTime() < 3 * 60 * 1000;
-    return `<div class="card device">
-      <div><span class="dot ${online ? 'on' : 'off'}"></span><strong>${esc(d.name || 'Attendance device')}</strong>
-        <span class="muted"> · ${online ? 'Online' : 'Offline'}</span></div>
-      <div class="row">
-        <span>Serial number: <span class="num">${esc(d.sn)}</span></span>
-        <span>Last seen: <span class="num">${new Date(d.last_seen).toLocaleString('en-GB')}</span></span>
-        <span>Total punches: <span class="num">${d.total}</span></span>
-        ${d.pending ? `<span>Pending commands: <span class="num">${d.pending}</span></span>` : ''}
-      </div>
-      <div class="actions">
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="sync-users">Pull employee names from device</button>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="resend-logs">Re-pull all punches</button>
-        <button class="btn small" data-sn="${esc(d.sn)}" data-act="rename">Rename device</button>
-      </div></div>`;
-  }).join('') : '<div class="card empty">No device has connected yet. Configure the Cloud Server settings on the device and it will appear here within a minute.</div>';
-  document.querySelectorAll('[data-act]').forEach((b) => {
-    b.onclick = async () => {
-      const sn = b.dataset.sn;
-      if (b.dataset.act === 'rename') {
-        const name = prompt('Device name (e.g. Main Entrance)');
-        if (name === null) return;
-        await api('/api/devices/' + encodeURIComponent(sn), { method: 'PUT', body: JSON.stringify({ name }) });
-        return loadDevices();
-      }
-      await api(`/api/devices/${encodeURIComponent(sn)}/${b.dataset.act}`, { method: 'POST' });
-      toast('Command sent. The device will run it within seconds.');
-      loadDevices();
-    };
-  });
-}
-
-/* Init */
-(async () => {
-  const today = localDate();
-  $('day').value = today;
-  $('to').value = today;
-  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-  $('from').value = localDate(weekAgo);
-  try { workStart = (await api('/api/config')).workStart; } catch (_) {}
-  $('workStart').textContent = workStart;
-  loadToday();
-  loadEmployees();
-  setInterval(() => { if (!$('tab-today').hidden) loadToday(); }, 30000);
-})();
-</script>
+<script src="/static/app.js"></script>
 </body>
 </html>

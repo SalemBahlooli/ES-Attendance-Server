@@ -2,6 +2,8 @@ const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const { pool, init } = require('./db');
+const importer = require('./lib/importer');
+const zkLan = require('./lib/zk-lan');
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -93,8 +95,10 @@ iclock.post('/cdata', async (req, res) => {
         const [pin, time, status, verify] = line.split('\t');
         if (!pin || !time) continue;
         const r = await pool.query(
-          `INSERT INTO attendance (sn, pin, punch_time, status, verify, raw)
-           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
+          `INSERT INTO attendance (sn, pin, punch_time, status, verify, raw, source)
+           SELECT $1::text, $2::text, $3::timestamp, $4::int, $5::int, $6::text, 'adms'
+           WHERE NOT EXISTS (SELECT 1 FROM attendance WHERE pin = $2::text AND punch_time = $3::timestamp)
+           ON CONFLICT DO NOTHING`,
           [sn, pin.trim(), time.trim(), parseInt(status, 10) || 0, parseInt(verify, 10) || 0, line]
         );
         saved += r.rowCount;
@@ -221,7 +225,9 @@ function requireAuth(req, res, next) {
 }
 
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+const jsonParser = express.json();
+// /api/import/records has its own (larger) JSON limit
+app.use((req, res, next) => (req.path === '/api/import/records' ? next() : jsonParser(req, res, next)));
 
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 
@@ -251,6 +257,12 @@ app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'publi
 
 const api = express.Router();
 api.use(requireAuth);
+// Pass async errors to Express instead of crashing the process
+const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+for (const m of ['get', 'post', 'put', 'delete']) {
+  const orig = api[m].bind(api);
+  api[m] = (route, ...handlers) => orig(route, ...handlers.map(wrap));
+}
 
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
 
@@ -275,21 +287,75 @@ api.get('/summary', async (req, res) => {
   res.json(rows);
 });
 
-api.get('/punches', async (req, res) => {
-  const { from, to, pin } = req.query;
-  if (!isDate(from) || !isDate(to)) return res.status(400).json({ error: 'bad date' });
+// Builds "WHERE ..." for a date range plus optional employee / device filters
+function rangeFilter(q, alias = 'a') {
+  const { from, to, pin, sn } = q;
+  if (!isDate(from) || !isDate(to)) return null;
   const params = [from, to];
-  let where = 'a.punch_time >= $1::date AND a.punch_time < $2::date + 1';
-  if (pin) { params.push(pin); where += ` AND a.pin = $${params.length}`; }
+  let where = `${alias}.punch_time >= $1::date AND ${alias}.punch_time < $2::date + 1`;
+  if (pin) { params.push(String(pin)); where += ` AND ${alias}.pin = $${params.length}`; }
+  if (sn) { params.push(String(sn)); where += ` AND ${alias}.sn = $${params.length}`; }
+  return { where, params };
+}
+
+api.get('/punches', async (req, res) => {
+  const f = rangeFilter(req.query);
+  if (!f) return res.status(400).json({ error: 'bad date' });
   const { rows } = await pool.query(
-    `SELECT a.id, a.pin, e.name, a.punch_time, a.verify, a.status, a.sn, d.name AS device_name
+    `SELECT a.id, a.pin, e.name, a.punch_time, a.verify, a.status, a.sn, a.source, d.name AS device_name
      FROM attendance a
      LEFT JOIN employees e ON e.pin = a.pin
      LEFT JOIN devices d ON d.sn = a.sn
-     WHERE ${where} ORDER BY a.punch_time DESC LIMIT 5000`,
-    params
+     WHERE ${f.where} ORDER BY a.punch_time DESC LIMIT 5000`,
+    f.params
   );
   res.json(rows);
+});
+
+// Which days have punches (for the calendar)
+api.get('/days', async (req, res) => {
+  const f = rangeFilter(req.query);
+  if (!f) return res.status(400).json({ error: 'bad date' });
+  const { rows } = await pool.query(
+    `SELECT to_char(a.punch_time, 'YYYY-MM-DD') AS day, COUNT(*)::int AS punches,
+            COUNT(DISTINCT a.pin)::int AS employees
+     FROM attendance a WHERE ${f.where} GROUP BY 1 ORDER BY 1`,
+    f.params
+  );
+  res.json(rows);
+});
+
+// First and last day that have any punch
+api.get('/bounds', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT to_char(MIN(punch_time), 'YYYY-MM-DD') AS first, to_char(MAX(punch_time), 'YYYY-MM-DD') AS last,
+            COUNT(*)::int AS total FROM attendance`
+  );
+  res.json(rows[0]);
+});
+
+// Everything the dashboard needs for a period: one row per employee per day + punches per hour
+api.get('/range', async (req, res) => {
+  const f = rangeFilter(req.query);
+  if (!f) return res.status(400).json({ error: 'bad date' });
+  const days = (new Date(req.query.to) - new Date(req.query.from)) / 86400000;
+  if (days < 0 || days > 400) return res.status(400).json({ error: 'Pick a period of 400 days or less' });
+  const [daily, hours, employees] = await Promise.all([
+    pool.query(
+      `SELECT to_char(a.punch_time, 'YYYY-MM-DD') AS day, a.pin,
+              MIN(a.punch_time) AS first_in, MAX(a.punch_time) AS last_out, COUNT(*)::int AS punches,
+              array_agg(to_char(a.punch_time, 'HH24:MI') ORDER BY a.punch_time) AS times
+       FROM attendance a WHERE ${f.where} GROUP BY 1, 2 ORDER BY 1, 3`,
+      f.params
+    ),
+    pool.query(
+      `SELECT EXTRACT(HOUR FROM a.punch_time)::int AS hour, COUNT(*)::int AS punches
+       FROM attendance a WHERE ${f.where} GROUP BY 1 ORDER BY 1`,
+      f.params
+    ),
+    pool.query(`SELECT pin, name FROM employees`),
+  ]);
+  res.json({ daily: daily.rows, hours: hours.rows, employees: employees.rows });
 });
 
 api.get('/employees', async (req, res) => {
@@ -310,6 +376,96 @@ api.put('/employees/:pin', async (req, res) => {
     [req.params.pin, name]
   );
   res.json({ ok: true });
+});
+
+/* ---------- Import: USB / file ---------- */
+
+const bigText = express.text({ type: () => true, limit: '60mb' });
+
+// POST raw file text. ?filename=&sn=&dateOrder=dmy|mdy&dry=1
+api.post('/import/file', bigText, async (req, res) => {
+  const text = typeof req.body === 'string' ? req.body : '';
+  const filename = String(req.query.filename || '').slice(0, 200);
+  const parsed = importer.parseAttendanceText(text, { filename, dateOrder: req.query.dateOrder === 'mdy' ? 'mdy' : 'dmy' });
+  if (!parsed.rows.length) {
+    return res.status(400).json({
+      error: 'No punches found in this file. Supported: attlog.dat from the device USB export, ' +
+        'or a CSV/TXT with an employee ID column and a date/time column.',
+      format: parsed.format, skipped: parsed.skipped,
+    });
+  }
+  if (parsed.rows.length > importer.MAX_ROWS) return res.status(400).json({ error: 'File is too large' });
+  const summary = importer.summarise(parsed.rows);
+
+  if (req.query.dry) {
+    const existing = await importer.countExisting(pool, parsed.rows);
+    return res.json({
+      format: parsed.format, skipped: parsed.skipped, ...summary, existing,
+      names: parsed.users.length, sample: parsed.rows.slice(0, 8).map(({ pin, time }) => ({ pin, time })),
+    });
+  }
+
+  const sn = String(req.query.sn || '').trim() || 'USB';
+  const result = await importer.savePunches(pool, parsed.rows, { sn, source: 'file' });
+  const names = await importer.saveUsers(pool, parsed.users);
+  await importer.logImport(pool, { source: 'file', label: filename, sn, result, names });
+  console.log(`[IMPORT] file ${filename}: ${result.inserted} new of ${result.total}`);
+  res.json({ ...summary, ...result, names, skipped: parsed.skipped });
+});
+
+// Punches as JSON - used by tools/lan-bridge.js running on a PC next to the device
+api.post('/import/records', express.json({ limit: '60mb' }), async (req, res) => {
+  const { rows, skipped } = importer.cleanRecords(req.body.records);
+  const sn = String(req.body.sn || '').trim() || 'LAN';
+  if (rows.length > importer.MAX_ROWS) return res.status(400).json({ error: 'Too many records' });
+  if (sn !== 'LAN') {
+    await pool.query(
+      `INSERT INTO devices (sn, name) VALUES ($1, $2) ON CONFLICT (sn) DO NOTHING`,
+      [sn, req.body.deviceName || null]);
+    if (req.body.ip) await pool.query(`UPDATE devices SET lan_ip = $2 WHERE sn = $1`, [sn, String(req.body.ip)]);
+  }
+  const result = await importer.savePunches(pool, rows, { sn, source: 'lan' });
+  const names = await importer.saveUsers(pool, req.body.users);
+  if (result.inserted || names || req.body.log !== false) {
+    await importer.logImport(pool, { source: 'lan-bridge', label: req.body.ip || null, sn, result, names });
+  }
+  res.json({ ...result, names, skipped });
+});
+
+api.get('/imports', async (req, res) => {
+  const { rows } = await pool.query(`SELECT * FROM imports ORDER BY id DESC LIMIT 30`);
+  res.json(rows);
+});
+
+/* ---------- LAN: talk to the device directly on port 4370 ---------- */
+
+api.post('/lan/test', async (req, res) => {
+  try {
+    res.json(await zkLan.deviceInfo({ ip: String(req.body.ip || '').trim(), port: req.body.port }));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+api.post('/lan/pull', async (req, res) => {
+  const ip = String(req.body.ip || '').trim();
+  const port = parseInt(req.body.port, 10) || 4370;
+  let data;
+  try {
+    data = await zkLan.pullFromDevice({ ip, port, timeout: 20000 });
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+  const sn = data.sn || `LAN-${ip}`;
+  await pool.query(
+    `INSERT INTO devices (sn, lan_ip, lan_port) VALUES ($1, $2, $3)
+     ON CONFLICT (sn) DO UPDATE SET lan_ip = EXCLUDED.lan_ip, lan_port = EXCLUDED.lan_port`,
+    [sn, ip, port]);
+  const result = await importer.savePunches(pool, data.rows, { sn, source: 'lan' });
+  const names = await importer.saveUsers(pool, data.users);
+  await importer.logImport(pool, { source: 'lan', label: `${ip}:${port}`, sn, result, names });
+  console.log(`[LAN] ${ip}: ${result.inserted} new of ${result.total}`);
+  res.json({ sn, ...result, names, ...importer.summarise(data.rows) });
 });
 
 api.get('/devices', async (req, res) => {
@@ -342,26 +498,32 @@ api.post('/devices/:sn/:action', async (req, res) => {
 });
 
 app.use('/api', api);
+app.use('/api', (err, req, res, next) => {
+  console.error('[API]', req.method, req.originalUrl, err);
+  res.status(err.status || 500).json({ error: err.type === 'entity.too.large' ? 'File is too large' : 'Server error' });
+});
 
-app.get('/export.csv', requireAuth, async (req, res) => {
-  const { from, to } = req.query;
-  if (!isDate(from) || !isDate(to)) return res.status(400).send('bad date');
-  const { rows } = await pool.query(
-    `SELECT a.pin, e.name, to_char(a.punch_time, 'YYYY-MM-DD') AS day,
-            to_char(a.punch_time, 'HH24:MI:SS') AS time, COALESCE(d.name, a.sn) AS device
-     FROM attendance a
-     LEFT JOIN employees e ON e.pin = a.pin
-     LEFT JOIN devices d ON d.sn = a.sn
-     WHERE a.punch_time >= $1::date AND a.punch_time < $2::date + 1
-     ORDER BY a.punch_time`,
-    [from, to]
-  );
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['Employee ID', 'Name', 'Date', 'Time', 'Device'].map(esc).join(',')];
-  for (const r of rows) lines.push([r.pin, r.name, r.day, r.time, r.device].map(esc).join(','));
-  res.set('Content-Type', 'text/csv; charset=utf-8');
-  res.set('Content-Disposition', `attachment; filename="attendance_${from}_${to}.csv"`);
-  res.send('﻿' + lines.join('\r\n'));
+app.get('/export.csv', requireAuth, async (req, res, next) => {
+  try {
+    const f = rangeFilter(req.query);
+    if (!f) return res.status(400).send('bad date');
+    const { rows } = await pool.query(
+      `SELECT a.pin, e.name, to_char(a.punch_time, 'YYYY-MM-DD') AS day,
+              to_char(a.punch_time, 'HH24:MI:SS') AS time, COALESCE(d.name, a.sn) AS device
+       FROM attendance a
+       LEFT JOIN employees e ON e.pin = a.pin
+       LEFT JOIN devices d ON d.sn = a.sn
+       WHERE ${f.where}
+       ORDER BY a.punch_time`,
+      f.params
+    );
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['Employee ID', 'Name', 'Date', 'Time', 'Device'].map(esc).join(',')];
+    for (const r of rows) lines.push([r.pin, r.name, r.day, r.time, r.device].map(esc).join(','));
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="attendance_${req.query.from}_${req.query.to}.csv"`);
+    res.send('\uFEFF' + lines.join('\r\n'));
+  } catch (e) { next(e); }
 });
 
 app.use('/static', express.static(path.join(__dirname, 'public')));
