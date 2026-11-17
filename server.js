@@ -364,6 +364,37 @@ api.post('/import/file', need('data.import'), bigText, h(async (req, res) => {
   res.json({ ...summary, ...result, names, skipped: parsed.skipped });
 }));
 
+// Attendance file plus the optional ZKTeco user.dat in one request. This is
+// separate from /import/file so older integrations can keep posting raw text.
+api.post('/import/combined', need('data.import'), express.json({ limit: '60mb' }), h(async (req, res) => {
+  const text = String(req.body && req.body.attendance || '');
+  const filename = String(req.body && req.body.filename || '').slice(0, 200);
+  const parsed = importer.parseAttendanceText(text, {
+    filename, dateOrder: req.body && req.body.dateOrder === 'mdy' ? 'mdy' : 'dmy',
+  });
+  if (!parsed.rows.length) return res.status(400).json({ error: 'No punches found in the attendance file.' });
+  if (parsed.rows.length > importer.MAX_ROWS) return res.status(400).json({ error: 'The file is too large' });
+  let deviceUsers = [];
+  if (req.body && req.body.userDat) {
+    try { deviceUsers = importer.parseUserDat(Buffer.from(String(req.body.userDat), 'base64')); }
+    catch (_) { return res.status(400).json({ error: 'The user.dat file could not be read' }); }
+  }
+  const users = [...parsed.users, ...deviceUsers];
+  const summary = importer.summarise(parsed.rows);
+  const matchedNames = new Set(users.filter((u) => parsed.rows.some((r) => r.pin === String(u.pin))).map((u) => String(u.pin))).size;
+  if (req.body && req.body.dry) {
+    const existing = await importer.countExisting(pool, parsed.rows);
+    return res.json({ format: parsed.format, skipped: parsed.skipped, ...summary, existing,
+      names: users.length, matchedNames, sample: parsed.rows.slice(0, 8).map(({ pin, time }) => ({ pin, time })) });
+  }
+  const sn = String(req.body && req.body.sn || '').trim() || 'USB';
+  const result = await importer.savePunches(pool, parsed.rows, { sn, source: 'file' });
+  const names = await importer.saveUsers(pool, users);
+  await importer.logImport(pool, { source: 'file', label: filename, sn, result, names, username: req.user.username });
+  await audit(req, 'Import punches and user.dat', `${filename}: ${result.inserted} new punches, ${names} names`);
+  res.json({ ...summary, ...result, names, matchedNames, skipped: parsed.skipped });
+}));
+
 // Punches as JSON from tools/lan-bridge.js (a PC on the office network)
 api.post('/import/records', need('data.import'), express.json({ limit: '60mb' }), h(async (req, res) => {
   const { rows, skipped } = importer.cleanRecords(req.body.records);
@@ -714,6 +745,29 @@ api.put('/employees/:pin', need('employees.edit'), h(async (req, res) => {
   await audit(req, 'Edit employee',
     `${await employeeLabel(req.params.pin)}: ` + keys.map((k, i) => `${LABELS[k]} = ${values[i] ?? 'empty'}`).join(', '));
   res.json({ ok: true });
+}));
+
+// Removing employees is intentionally explicit: their attendance and leave
+// records are removed with them, so old IDs do not stay in reports.
+api.post('/employees/delete', need('employees.edit'), h(async (req, res) => {
+  const pins = [...new Set((req.body && req.body.pins || []).map((p) => String(p).trim()).filter(Boolean))];
+  if (!pins.length) return res.status(400).json({ error: 'Select at least one employee' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query('SELECT pin, name FROM employees WHERE pin = ANY($1::text[])', [pins]);
+    const found = rows.map((r) => r.pin);
+    if (found.length) {
+      await client.query('DELETE FROM attendance WHERE pin = ANY($1::text[])', [found]);
+      await client.query('DELETE FROM employees WHERE pin = ANY($1::text[])', [found]);
+    }
+    await client.query('COMMIT');
+    await audit(req, 'Delete employees', rows.map((r) => `${r.name || 'No name'} (${r.pin})`).join(', '));
+    res.json({ deleted: found.length });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally { client.release(); }
 }));
 
 api.get('/devices', need('devices.view'), h(async (req, res) => {

@@ -1,6 +1,6 @@
 /* Import data: USB / file upload, direct LAN pull, LAN bridge instructions and history */
 
-let impText = null, impName = '';
+let impText = null, impName = '', impUserDat = null, impUserName = '';
 let impDevices = [];
 
 // Files from the device or Excel can be UTF-8, UTF-16 or Windows Arabic
@@ -21,6 +21,9 @@ const impDay = (ts) => niceDate(ts.slice(0, 10), { year: true });
 
 async function impChoose(file) {
   if (!file) return;
+  // People commonly choose user.dat in the large drop area first. Treat it
+  // as the optional names file instead of trying to parse it as attendance.
+  if (/^user\.dat$/i.test(file.name)) return impChooseUser(file);
   if (file.size > 60 * 1024 * 1024) return impPreview('<div class="result err">The file is larger than 60 MB.</div>');
   impName = file.name;
   impText = impDecode(await file.arrayBuffer());
@@ -28,6 +31,9 @@ async function impChoose(file) {
 }
 
 function impPost(extra) {
+  if (impUserDat) return api('/api/import/combined', { method: 'POST', body: JSON.stringify({
+    attendance: impText, filename: impName, userDat: impUserDat, dateOrder: $('impDateOrder').value, ...extra,
+  }) });
   const p = new URLSearchParams({ filename: impName, dateOrder: $('impDateOrder').value, ...extra });
   return api('/api/import/file?' + p, { method: 'POST', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: impText });
 }
@@ -45,7 +51,7 @@ async function impCheck() {
     <dl class="kv">
       <dt>Format</dt><dd>${esc(r.format)}</dd>
       <dt>Punches found</dt><dd>${r.count}</dd>
-      <dt>Employees</dt><dd>${r.employees}${r.names ? ` (${r.names} with names)` : ''}</dd>
+      <dt>Employees</dt><dd>${r.employees}${r.names ? ` (${r.names} names${r.matchedNames != null ? `, ${r.matchedNames} matched to punches` : ''})` : ''}</dd>
       <dt>Period</dt><dd>${impDay(r.first)} – ${impDay(r.last)}</dd>
       <dt>Already saved</dt><dd>${r.existing}</dd>
       <dt>New punches</dt><dd><b>${fresh}</b></dd>
@@ -101,7 +107,8 @@ async function impCommit() {
   catch (e) { return impPreview(`<div class="result err">${esc(e.message || 'Import failed')}</div>`); }
   if (r.kind === 'branch') {
     impText = null;
-    $('impFile').value = '';
+    impUserDat = null;
+    $('impFile').value = ''; $('impUserFile').value = ''; $('impUserName').textContent = '';
     impPreview(`<div class="result ok"><strong>Imported from ${esc(r.branchName)}</strong>
       <span>${r.inserted} new punches${r.duplicates ? ` (${r.duplicates} were already here)` : ''}, ${r.newEmployees} new employees${r.removed ? `, ${r.removed} old punches taken out` : ''}${r.leaves ? `, ${r.leaves} leaves` : ''}.</span>
       ${canTab('overview') ? '<div class="actions"><button class="btn small" id="impView">View these days</button></div>' : ''}</div>`);
@@ -113,7 +120,8 @@ async function impCommit() {
     return impAfterChange();
   }
   impText = null;
-  $('impFile').value = '';
+  impUserDat = null;
+  $('impFile').value = ''; $('impUserFile').value = ''; $('impUserName').textContent = '';
   impPreview(`<div class="result ok"><strong>Import complete</strong>
     <span>${r.inserted} new punches saved, ${r.duplicates} were already saved${r.names ? `, ${r.names} names added` : ''}.</span>
     ${canTab('overview') ? '<div class="actions"><button class="btn small" id="impView">View these days</button></div>' : ''}</div>`);
@@ -126,7 +134,7 @@ async function impCommit() {
   impAfterChange();
 }
 
-function impReset() { impText = null; $('impFile').value = ''; impPreview(''); }
+function impReset() { impText = null; impUserDat = null; impUserName = ''; $('impFile').value = ''; $('impUserFile').value = ''; $('impUserName').textContent = ''; impPreview(''); }
 function impAfterChange() {
   calCache.clear();
   ovBounds = null;
@@ -137,6 +145,22 @@ function impAfterChange() {
 }
 
 $('impFile').onchange = () => impChoose($('impFile').files[0]);
+function impBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+async function impChooseUser(file) {
+  if (!file) return;
+  if (file.size > 10 * 1024 * 1024) return impPreview('<div class="result err">The user.dat file is larger than 10 MB.</div>');
+  impUserDat = impBase64(await file.arrayBuffer());
+  impUserName = file.name;
+  $('impUserName').textContent = `(${impUserName})`;
+  if (impText) return impCheck();
+  impPreview('<div class="result ok"><strong>user.dat selected</strong><span> Now choose the attendance file (for example <span class="code">RKQ4253600353_attlog.dat</span>) in the large box above.</span></div>');
+}
+$('impUserFile').onchange = () => impChooseUser($('impUserFile').files[0]);
 $('impDateOrder').onchange = impCheck;
 const impDrop = $('impDrop');
 ['dragenter', 'dragover'].forEach((ev) => impDrop.addEventListener(ev, (e) => { e.preventDefault(); impDrop.classList.add('over'); }));

@@ -179,7 +179,7 @@
         <h3>From USB or a file</h3>
         <ol class="steps muted">
           <li>On the device: <b>Menu → PenDrive Mng</b> (or <b>USB Manager</b>) <b>→ Download AttLog</b>.</li>
-          <li>Plug the USB stick into this computer and choose the file, usually <span class="code">1_attlog.dat</span> or <span class="code">&lt;serial&gt;_attlog.dat</span>.</li>
+          <li>Choose the attendance file, usually <span class="code">1_attlog.dat</span> or <span class="code">&lt;serial&gt;_attlog.dat</span>. You can also add <span class="code">user.dat</span> to import names matched by employee ID.</li>
           <li>CSV or TXT files also work, for example an export from ZKTeco software saved as CSV. They need an employee ID column and a date/time column.</li>
           <li>A file sent by another branch (<span class="code">Attendance_….json</span>) is imported here too.</li>
         </ol>
@@ -188,6 +188,7 @@
           <strong>Drop the file here</strong>
           <span class="muted">or click to choose it</span>
         </label>
+        <label class="check"><input type="file" id="impUserFile" accept=".dat,application/octet-stream" hidden> Add <span class="code">user.dat</span> (optional) <span id="impUserName" class="muted"></span></label>
         <div class="form-row">
           <label>Save under device <select id="impSn"></select></label>
           <label>Date format in CSV
@@ -362,12 +363,14 @@
     <div class="toolbar">
       <input type="search" id="empSearch" placeholder="Search by name or ID">
       <label class="check"><input type="checkbox" id="empShowInactive"> Show inactive employees</label>
+      <span class="spacer"></span>
+      <button class="btn danger" id="empDeleteSelected" hidden>Delete selected</button>
     </div>
     <p class="muted hint">Changes are saved automatically. Inactive employees, such as those whose employment has ended, are excluded from attendance records and absence counts.
       If no start date is set, attendance is calculated from the employee's first recorded punch.</p>
     <div class="card table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>Start date</th><th>Active</th><th>Last punch</th><th></th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="empSelectAll" aria-label="Select all employees"></th><th>ID</th><th>Name</th><th>Department</th><th>Shift</th><th>Start date</th><th>Active</th><th>Last punch</th><th></th></tr></thead>
         <tbody id="empRows"></tbody>
       </table>
     </div>

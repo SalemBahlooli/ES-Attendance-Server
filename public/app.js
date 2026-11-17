@@ -303,6 +303,7 @@ function renderEmployees() {
   const rows = employees.filter((e) => ($('empShowInactive').checked || e.active) &&
     (!q || e.pin.includes(q) || (e.name || '').includes(q)));
   $('empRows').innerHTML = rows.length ? rows.map((e) => `<tr class="${e.active ? '' : 'inactive'}" data-pin="${esc(e.pin)}">
+    <td><input type="checkbox" class="emp-select" value="${esc(e.pin)}" aria-label="Select ${esc(e.pin)}"></td>
     <td class="num">${esc(e.pin)}</td>
     <td><input class="name-input" data-field="name" value="${esc(e.name)}" placeholder="Enter name"></td>
     <td><select data-field="department_id">${options(meta.departments, e.department_id, 'No department')}</select></td>
@@ -311,8 +312,23 @@ function renderEmployees() {
     <td><input type="checkbox" data-field="active" ${e.active ? 'checked' : ''}></td>
     <td class="num">${e.last_punch ? esc(e.last_punch.slice(0, 16)) : '—'}</td>
     <td><button class="btn small" data-emp-open="${esc(e.pin)}">View punches</button></td>
-  </tr>`).join('') : '<tr><td colspan="8" class="empty">No employees</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="9" class="empty">No employees</td></tr>';
   document.querySelectorAll('[data-emp-open]').forEach((b) => (b.onclick = () => openEmployee(b.dataset.empOpen)));
+
+  const updateDelete = () => {
+    const n = document.querySelectorAll('.emp-select:checked').length;
+    $('empDeleteSelected').hidden = !can('employees.edit') || !n;
+    $('empDeleteSelected').textContent = `Delete selected (${n})`;
+    $('empSelectAll').checked = rows.length > 0 && n === rows.length;
+    $('empSelectAll').indeterminate = n > 0 && n < rows.length;
+  };
+  document.querySelectorAll('.emp-select').forEach((box) => (box.onchange = updateDelete));
+  $('empSelectAll').checked = false;
+  $('empSelectAll').indeterminate = false;
+  $('empSelectAll').onchange = () => {
+    document.querySelectorAll('.emp-select').forEach((box) => { box.checked = $('empSelectAll').checked; });
+    updateDelete();
+  };
 
   if (!can('employees.edit')) document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.disabled = true));
   document.querySelectorAll('#empRows [data-field]').forEach((inp) => (inp.onchange = async () => {
@@ -330,6 +346,16 @@ function renderEmployees() {
 }
 $('empSearch').oninput = renderEmployees;
 $('empShowInactive').onchange = renderEmployees;
+$('empDeleteSelected').onclick = async () => {
+  const pins = [...document.querySelectorAll('.emp-select:checked')].map((box) => box.value);
+  if (!pins.length || !confirm(`Delete ${pins.length} selected employee(s), including their attendance and leave records? This cannot be undone.`)) return;
+  $('empDeleteSelected').disabled = true;
+  try {
+    const r = await send('/api/employees/delete', 'POST', { pins });
+    toast(`${r.deleted} employee(s) deleted`);
+    await loadEmployeeList(); renderEmployees(); report = null;
+  } finally { $('empDeleteSelected').disabled = false; }
+};
 
 /* ---------------- Punch log ---------------- */
 async function loadLog() {
