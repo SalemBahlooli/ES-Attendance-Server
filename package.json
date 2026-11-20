@@ -1,18 +1,26 @@
 {
-  "name": "es-attendance-server",
-  "version": "1.0.0",
-  "description": "ZKTeco ADMS attendance server for Railway",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "exceljs": "^4.4.0",
-    "express": "^4.21.2",
-    "pg": "^8.13.1",
-    "zkteco-js": "^1.7.2"
-  }
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "devDependencies": {
+        "@tailwindcss/forms": "^0.5.11",
+        "@tailwindcss/vite": "^4.0.0",
+        "concurrently": "^10.0.3",
+        "laravel-vite-plugin": "^3.1",
+        "tailwindcss": "^4.0.0",
+        "vite": "^8.0.0"
+    },
+    "optionalDependencies": {
+        "@laravel/multiplex": "^0.4.1"
+    },
+    "dependencies": {
+        "@alpinejs/collapse": "^3.17.5",
+        "@fortawesome/fontawesome-free": "^7.3.1",
+        "alpinejs": "^3.17.5",
+        "chart.js": "^4.6.1"
+    }
 }

@@ -1,0 +1,28 @@
+<x-layouts.app :title="$record->activityLabel()" :breadcrumbs="[__('%%labelPlural%%') => route('%%route%%.index'), $record->activityLabel() => null]">
+    <x-slot:actions>
+        @can('%%permission%%.edit')
+            <a href="{{ route('%%route%%.edit', $record) }}" class="btn btn-secondary"><i class="fa-solid fa-pen"></i>{{ __('Edit') }}</a>
+        @endcan
+        @can('%%permission%%.delete')
+            <x-delete-button :action="route('%%route%%.destroy', $record)" :confirm="__('Are you sure?')">{{ __('Delete') }}</x-delete-button>
+        @endcan
+    </x-slot:actions>
+
+    <div class="grid gap-5 lg:grid-cols-3">
+        <x-card :title="__('Details')" icon="%%icon%%" class="lg:col-span-2">
+            <dl class="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+                %%showFields%%
+            </dl>
+        </x-card>
+
+        <x-card :title="__('History')" icon="fa-clock-rotate-left" :padding="false">
+            @include('activity.partials.feed', [
+                'logs' => \App\Models\ActivityLog::with('causer')->where('subject_type', $record->getMorphClass())->where('subject_id', $record->id)->latest('id')->limit(10)->get(),
+                'showCauser' => true,
+            ])
+            <x-slot:footer>
+                <span class="text-xs text-slate-500">{{ __('Created') }} {{ format_datetime($record->created_at) }}@if ($record->creator) · {{ __('by :name', ['name' => $record->creator->name]) }}@endif</span>
+            </x-slot:footer>
+        </x-card>
+    </div>
+</x-layouts.app>

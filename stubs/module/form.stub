@@ -1,0 +1,18 @@
+@php $editing = $record->exists; @endphp
+<x-layouts.app :title="$editing ? $record->activityLabel() : __('Add')"
+               :breadcrumbs="[__('%%labelPlural%%') => route('%%route%%.index')] + ($editing ? [$record->activityLabel() => route('%%route%%.show', $record), __('Edit') => null] : [__('Add') => null])">
+    <form method="POST" action="{{ $editing ? route('%%route%%.update', $record) : route('%%route%%.store') }}" class="max-w-3xl">
+        @csrf
+        @if ($editing) @method('PUT') @endif
+
+        <x-card :title="__('Details')" icon="%%icon%%">
+            <div class="grid gap-4 sm:grid-cols-2">
+                    %%formFields%%
+            </div>
+            <x-slot:footer>
+                <a href="{{ $editing ? route('%%route%%.show', $record) : route('%%route%%.index') }}" class="btn btn-secondary">{{ __('Cancel') }}</a>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i>{{ __('Save') }}</button>
+            </x-slot:footer>
+        </x-card>
+    </form>
+</x-layouts.app>

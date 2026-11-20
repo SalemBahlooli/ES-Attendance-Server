@@ -1,0 +1,8 @@
+{
+  "name": "es-attendance-lan-bridge",
+  "private": true,
+  "description": "Reads a ZKTeco device over the LAN and sends its punches to the attendance server",
+  "main": "lan-bridge.js",
+  "engines": { "node": ">=18" },
+  "dependencies": { "zkteco-js": "^1.7.2" }
+}

@@ -1,0 +1,5 @@
+@extends('errors.layout')
+@section('code', '404')
+@section('icon', 'fa-compass')
+@section('title', __('Page not found'))
+@section('message', __('The page does not exist or was moved.'))

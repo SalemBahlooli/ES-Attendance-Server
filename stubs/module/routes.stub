@@ -1,0 +1,11 @@
+<?php
+
+use App\Http\Controllers\%%Model%%Controller;
+use Illuminate\Support\Facades\Route;
+
+/*
+| %%labelPlural%% — loaded automatically by routes/web.php (signed-in users only).
+| Permissions are checked in %%Model%%Controller::middleware().
+*/
+
+Route::resource('%%route%%', %%Model%%Controller::class)->parameters(['%%route%%' => '%%model%%']);

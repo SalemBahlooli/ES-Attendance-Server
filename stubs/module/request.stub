@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+/** Validation for creating and editing a %%label%%. */
+class %%Model%%Request extends FormRequest
+{
+    public function authorize(): bool
+    {
+        // Route middleware already checked %%permission%%.create / %%permission%%.edit.
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            %%rules%%
+        ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // Toggles submit "0"/"1"; nothing else to prepare by default.
+    }
+}

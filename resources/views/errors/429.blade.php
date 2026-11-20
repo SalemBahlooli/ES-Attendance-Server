@@ -1,0 +1,5 @@
+@extends('errors.layout')
+@section('code', '429')
+@section('icon', 'fa-gauge-high')
+@section('title', __('Too many requests'))
+@section('message', __('Slow down a little and try again in a minute.'))

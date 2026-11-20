@@ -1,0 +1,259 @@
+/*
+ | The look of the app: a light slate surface with one blue accent (the brand
+ | color from Settings → Branding). White top bar, white icon rail with fly-out
+ | menus, white cards with a hairline border and a soft shadow.
+ |
+ | Edit the classes here to re-skin every page at once.
+ */
+@layer components {
+    /* ------------------------------------------------------------ cards */
+    .card {
+        @apply rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,.05)];
+    }
+    .card-header {
+        @apply flex items-center justify-between gap-3 border-b border-[#eef2f6] px-5 py-3.5;
+    }
+    .card-title {
+        @apply text-sm font-bold text-slate-800;
+    }
+    .card-body {
+        @apply p-5;
+    }
+
+    /* Page title card (drawn by the app layout) */
+    .page-head {
+        @apply mb-4 flex flex-wrap items-center gap-4 rounded-[14px] border border-[#e6ebf2] bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,.05)];
+    }
+    .page-head-icon {
+        @apply flex size-[46px] shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xl text-brand-600;
+    }
+    .page-head h1 {
+        @apply text-lg leading-tight font-extrabold tracking-[-.2px] text-slate-900;
+    }
+    .page-head .sub {
+        @apply mt-[3px] text-xs font-semibold text-slate-400;
+    }
+
+    /* ---------------------------------------------------------- buttons */
+    .btn {
+        @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors focus:outline-none disabled:pointer-events-none disabled:opacity-50;
+    }
+    .btn-sm {
+        @apply px-2.5 py-1.5 text-xs;
+    }
+    .btn-primary {
+        @apply border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700 focus-visible:ring-3 focus-visible:ring-brand-600/25;
+    }
+    .btn-secondary {
+        @apply border-[#e2e8f0] bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-slate-300/40;
+    }
+    .btn-ghost {
+        @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+    }
+    .btn-danger {
+        @apply border-red-500 bg-red-500 text-white hover:border-red-600 hover:bg-red-600 focus-visible:ring-3 focus-visible:ring-red-500/25;
+    }
+    .btn-danger-soft {
+        @apply border-red-200 bg-white text-red-600 hover:bg-red-50;
+    }
+    .btn-success {
+        @apply border-green-500 bg-green-500 text-white hover:border-green-600 hover:bg-green-600;
+    }
+    .btn-icon {
+        @apply inline-flex size-9 cursor-pointer items-center justify-center rounded-[10px] text-slate-500 transition-colors hover:bg-brand-50 hover:text-brand-600;
+    }
+
+    /* ------------------------------------------------------------ forms */
+    .label {
+        @apply mb-1.5 block text-[12.5px] font-semibold text-slate-600;
+    }
+    .input {
+        @apply block w-full rounded-[9px] border-[#e2e8f0] bg-white text-sm text-slate-900 shadow-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-3 focus:ring-brand-600/15 disabled:bg-slate-50 disabled:text-slate-500;
+    }
+    .input-error {
+        @apply border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/15;
+    }
+    .help {
+        @apply mt-1.5 text-xs text-slate-500;
+    }
+    .error {
+        @apply mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600;
+    }
+    .checkbox {
+        @apply size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600/30;
+    }
+
+    /* ----------------------------------------------------------- tables */
+    .table {
+        @apply w-full text-[13px];
+    }
+    .table thead th {
+        @apply border-b border-[#eef2f6] bg-[#fafbfc] px-4 py-2.5 text-start text-[11px] font-bold tracking-[.4px] text-slate-400 uppercase;
+    }
+    .table tbody td {
+        @apply border-t border-[#f4f6f9] px-4 py-3 align-middle;
+    }
+    .table tbody tr {
+        @apply transition-colors hover:bg-[#f6f9fc];
+    }
+
+    .badge {
+        @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap;
+    }
+
+    /* ------------------------------------------------------------- tabs */
+    .tab {
+        @apply -mb-px inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 text-sm font-semibold whitespace-nowrap text-slate-500 hover:border-slate-300 hover:text-slate-700;
+    }
+    .tab-active {
+        @apply border-brand-600 text-brand-700 hover:border-brand-600 hover:text-brand-700;
+    }
+
+    .kbd {
+        @apply rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-xs text-slate-600;
+    }
+
+    /* ------------------------------------------------- dropdown menus */
+    .menu-panel {
+        @apply overflow-hidden rounded-xl border border-[#eef2f6] bg-white p-1.5 shadow-[0_12px_34px_rgba(15,23,42,.14)];
+    }
+    .menu-item {
+        @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap text-slate-700 hover:bg-slate-100 hover:text-slate-900;
+    }
+    .menu-heading {
+        @apply px-3 pt-2 pb-1 text-[11px] font-bold tracking-[.4px] text-slate-400 uppercase;
+    }
+
+    /* ---------------------------------------------------------- top bar */
+    .topbar-link {
+        @apply relative flex h-10 items-center gap-2 rounded-[10px] px-3 text-slate-500 transition-colors hover:bg-brand-50 hover:text-brand-600;
+    }
+    .topbar-link-active {
+        @apply bg-brand-50 text-brand-600 shadow-[inset_0_-2px_0_var(--brand)];
+    }
+
+    /* ------------------------------------------------------- side rail */
+    .rail-link {
+        @apply relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-center lg:rounded-none lg:px-0 lg:py-3;
+    }
+    .rail-link > i {
+        @apply w-5 text-center text-sm text-slate-400 transition-colors;
+    }
+    .rail-link:hover > i {
+        @apply text-slate-600;
+    }
+    .rail-link-active,
+    .rail-link-active:hover {
+        @apply bg-brand-50 font-semibold text-brand-700;
+    }
+    .rail-link-active > i,
+    .rail-link-active:hover > i {
+        @apply text-brand-600;
+    }
+    /* the fly-out shown next to an icon on large screens */
+    .rail-flyout {
+        @apply invisible absolute start-full top-0 z-50 min-w-52 overflow-hidden rounded-e-lg border border-[#e8edf2] bg-white opacity-0 shadow-[0_8px_22px_rgba(15,23,42,.12)] transition-opacity duration-100;
+    }
+    .rail-item:hover > .rail-flyout,
+    .rail-item:focus-within > .rail-flyout {
+        @apply visible opacity-100;
+    }
+    .rail-sublink {
+        @apply flex items-center gap-2.5 rounded-[7px] px-3 py-1.5 text-[12.5px] text-slate-500 hover:bg-slate-100 hover:text-slate-900;
+    }
+    .rail-sublink-active,
+    .rail-sublink-active:hover {
+        @apply bg-brand-50 font-semibold text-brand-700;
+    }
+}
+
+/* ---------------------------------------------------------------- sign-in
+ | Pages before sign-in: a faint dot grid on a soft blue gradient, with a
+ | light that eases toward the cursor (resources/js/app.js), and a frosted card.
+ */
+.auth-page {
+    background: linear-gradient(160deg, #eaf0fb 0%, #f5f8fe 48%, #e8eefb 100%);
+}
+.auth-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    --mx: 50%;
+    --my: 30%;
+    background:
+        radial-gradient(720px 520px at 14% 10%, color-mix(in oklab, var(--brand) 12%, transparent) 0%, transparent 60%),
+        radial-gradient(700px 540px at 88% 88%, rgba(99, 102, 241, 0.11) 0%, transparent 60%),
+        linear-gradient(160deg, #eef3fb 0%, #f6f9fe 50%, #eaf0fb 100%);
+}
+.auth-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(30, 41, 59, 0.11) 1.2px, transparent 1.6px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(130% 120% at 50% 0%, #000 35%, transparent 82%);
+}
+.auth-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        520px 520px at var(--mx) var(--my),
+        color-mix(in oklab, var(--brand) 20%, transparent) 0%,
+        color-mix(in oklab, var(--brand) 8%, transparent) 34%,
+        transparent 62%
+    );
+}
+
+@layer components {
+    .auth-card {
+        @apply w-full overflow-hidden rounded-[18px] border border-[#e2e8f0]/90 bg-white/90 shadow-[0_20px_50px_rgba(15,23,42,.1),0_2px_6px_rgba(15,23,42,.04)] backdrop-blur-md;
+    }
+    .auth-card-head {
+        @apply px-6 pt-7 pb-1.5 text-center sm:px-11 sm:pt-9;
+    }
+    .auth-card-head h1 {
+        @apply text-[22px] leading-tight font-extrabold tracking-[-.3px] text-slate-900;
+    }
+    .auth-card-head p {
+        @apply mt-1.5 text-[13px] text-slate-500;
+    }
+    .auth-card-body {
+        @apply px-6 pt-6 pb-7 sm:px-11 sm:pb-8;
+    }
+
+    /* inputs inside the card: taller, soft fill, icon at the start */
+    .auth-card .input {
+        @apply h-12 rounded-[11px] bg-slate-50 focus:bg-white;
+    }
+    .auth-card .input.ps-10 {
+        @apply ps-[42px];
+    }
+    .auth-card .btn-primary.w-full {
+        @apply h-[50px] rounded-[11px] text-[15px] font-bold tracking-[.2px] shadow-[0_8px_18px_color-mix(in_oklab,var(--brand)_32%,transparent)] hover:shadow-[0_10px_22px_color-mix(in_oklab,var(--brand)_40%,transparent)] active:translate-y-px;
+    }
+    .auth-link {
+        @apply text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline;
+    }
+
+    /* segmented "Password | Authenticator code" switch */
+    .auth-method {
+        @apply grid grid-cols-2 gap-1 rounded-xl border border-[#e2e8f0] bg-slate-100 p-1;
+    }
+    .auth-method button {
+        @apply flex h-[38px] cursor-pointer items-center justify-center gap-2 rounded-[9px] px-2.5 text-[13px] font-bold whitespace-nowrap text-slate-500 transition hover:text-slate-700;
+    }
+    .auth-method button[aria-pressed='true'] {
+        @apply bg-white text-brand-700 shadow-[0_1px_3px_rgba(15,23,42,.10),0_0_0_1px_rgba(226,232,240,.95)];
+    }
+
+    .auth-otp {
+        @apply text-center font-mono text-[22px] font-extrabold tracking-[.42em] tabular-nums placeholder:font-semibold placeholder:text-slate-300;
+    }
+
+    .spinner {
+        @apply inline-block size-4 animate-spin rounded-full border-2 border-white/45 border-t-white;
+    }
+}

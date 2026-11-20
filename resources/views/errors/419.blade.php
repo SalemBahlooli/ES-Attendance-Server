@@ -1,0 +1,5 @@
+@extends('errors.layout')
+@section('code', '419')
+@section('icon', 'fa-hourglass-end')
+@section('title', __('This page expired'))
+@section('message', __('You were away for a while. Go back, refresh the page and try again.'))

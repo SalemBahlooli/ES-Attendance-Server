@@ -1,0 +1,74 @@
+@import 'tailwindcss';
+@import '@fortawesome/fontawesome-free/css/all.min.css' layer(base);
+@import './components.css';
+
+@plugin '@tailwindcss/forms';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views';
+@source '../js';
+@source '../../app/Models';
+@source '../../config/menu.php';
+@source '../../config/permission_tree.php';
+
+/*
+ | The main color comes from Settings → Branding (primary_color) and is set on
+ | <html style="--brand: #xxxxxx">. Every shade is mixed from it, so one color
+ | re-themes the whole app. Use bg-brand-600, text-brand-700, ring-brand-500...
+ */
+@theme inline {
+    --font-sans: 'Inter', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+
+    --color-brand-50: color-mix(in oklab, var(--brand) 7%, white);
+    --color-brand-100: color-mix(in oklab, var(--brand) 14%, white);
+    --color-brand-200: color-mix(in oklab, var(--brand) 28%, white);
+    --color-brand-300: color-mix(in oklab, var(--brand) 45%, white);
+    --color-brand-400: color-mix(in oklab, var(--brand) 70%, white);
+    --color-brand-500: color-mix(in oklab, var(--brand) 88%, white);
+    --color-brand-600: var(--brand);
+    --color-brand-700: color-mix(in oklab, var(--brand) 85%, black);
+    --color-brand-800: color-mix(in oklab, var(--brand) 70%, black);
+    --color-brand-900: color-mix(in oklab, var(--brand) 55%, black);
+}
+
+:root {
+    --brand: #2563eb;
+}
+
+[dir='rtl'] {
+    --font-sans: 'IBM Plex Sans Arabic', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+@layer base {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-800 antialiased;
+    }
+
+    /* Icons that point "forward" flip in right-to-left languages */
+    [dir='rtl'] .rtl-flip {
+        transform: scaleX(-1);
+    }
+
+    ::selection {
+        @apply bg-brand-200;
+    }
+}
+
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    body {
+        background: white;
+    }
+}
