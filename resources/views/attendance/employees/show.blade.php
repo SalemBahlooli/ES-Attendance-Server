@@ -29,7 +29,7 @@
         <div class="flex flex-wrap gap-1.5">
             @foreach ($presets as $label => [$pf, $pt])
                 <a href="{{ route('employees.show', ['employee' => $employee, 'from' => $pf, 'to' => $pt, 'hide_off' => $hideOff ?: null]) }}"
-                   @class(['btn btn-sm', 'btn-primary' => $pf === $from && $pt === $to, 'btn-secondary' => ! ($pf === $from && $pt === $to)])>{{ $label }}</a>
+                   @class(['chip', 'chip-active' => $pf === $from && $pt === $to])>{{ $label }}</a>
             @endforeach
         </div>
         <form method="GET" class="flex flex-wrap items-end gap-2">

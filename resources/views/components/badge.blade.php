@@ -13,6 +13,6 @@
         'gray'   => 'bg-slate-100 text-slate-600 ring-slate-500/20',
     ];
 @endphp
-<span {{ $attributes->merge(['class' => 'badge ring-1 ring-inset '.($colors[$color] ?? $colors['gray'])]) }}>
+<span {{ $attributes->merge(['class' => 'badge '.($colors[$color] ?? $colors['gray'])]) }}>
     @if ($icon)<i class="fa-solid {{ $icon }} text-[10px]"></i>@endif{{ $slot }}
 </span>

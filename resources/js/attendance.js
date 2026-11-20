@@ -36,10 +36,22 @@ const dur = (m) => (m ? `${Math.floor(m / 60)}:${pad(Math.round(m % 60))}` : '')
 const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const clock = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(Math.round(m % 60))}`;
 
-// One palette for the charts and the map (status → colour)
-const COLORS = { ok: '#10b981', late: '#fbbf24', leave: '#38bdf8', absent: '#fb7185', off: '#e2e8f0' };
+// One palette for the charts and the map (status → colour), read from theme.css so dark mode follows
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const COLORS = {};
+function readColors() {
+    Object.assign(COLORS, {
+        ok: css('--color-att-ok'), late: css('--color-att-late'), leave: css('--color-att-leave'),
+        absent: css('--color-att-absent'), off: css('--color-att-off'), hours: css('--color-heat-4'),
+    });
+    if (window.Chart) {
+        window.Chart.defaults.color = css('--color-slate-500');
+        window.Chart.defaults.borderColor = css('--line-soft');
+        window.Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    }
+}
 const GROUP = { present: 'ok', offday_work: 'ok', late: 'late', leave: 'leave', absent: 'absent', weekend: 'off', holiday: 'off' };
-const MAP_CLASS = { ok: 'bg-emerald-500', late: 'bg-amber-400', leave: 'bg-sky-400', absent: 'bg-rose-400', off: 'bg-slate-200' };
+const MAP_CLASS = { ok: 'bg-att-ok', late: 'bg-att-late', leave: 'bg-att-leave', absent: 'bg-att-absent', off: 'bg-att-off' };
 const BADGE = {
     present: 'bg-green-50 text-green-700 ring-green-600/20', late: 'bg-amber-50 text-amber-800 ring-amber-600/20',
     absent: 'bg-red-50 text-red-700 ring-red-600/20', leave: 'bg-blue-50 text-blue-700 ring-blue-600/20',
@@ -181,7 +193,12 @@ export function registerAttendance(Alpine) {
         rows: [], summary: [], hours: [],
 
         init() {
+            readColors();
             this.load();
+            // Redraw in the new colours when the theme changes
+            const redraw = () => { readColors(); this.$nextTick(() => this.draw()); };
+            window.addEventListener('themechange', () => setTimeout(redraw, 30));
+            window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', redraw);
         },
 
         /* ---------- period ---------- */
@@ -301,13 +318,14 @@ export function registerAttendance(Alpine) {
         },
         cellClass(c) {
             const inRange = c.day >= this.from && c.day <= this.to;
-            const levels = ['bg-slate-50 text-slate-500', 'bg-teal-100 text-teal-900', 'bg-teal-200 text-teal-900', 'bg-teal-300 text-teal-950', 'bg-teal-400 text-white', 'bg-teal-600 text-white'];
+            const levels = ['text-slate-500', 'bg-heat-1 text-[var(--heat-ink-dark)] font-medium', 'bg-heat-2 text-[var(--heat-ink-dark)] font-medium',
+                'bg-heat-3 text-[var(--heat-ink-dark)] font-medium', 'bg-heat-4 text-[var(--heat-ink-light)] font-medium', 'bg-heat-5 text-[var(--heat-ink-light)] font-medium'];
             return [
                 levels[c.level],
-                inRange ? 'ring-2 ring-brand-500' : '',
-                c.day === this.pending ? 'ring-2 ring-amber-500' : '',
-                c.day === this.today ? 'font-bold' : '',
-                c.future ? 'opacity-40 cursor-not-allowed' : 'hover:ring-2 hover:ring-brand-300',
+                inRange ? 'ring-2 ring-inset ring-slate-900' : '',
+                c.day === this.pending ? 'ring-2 ring-inset ring-att-late' : '',
+                c.day === this.today ? 'underline underline-offset-4' : '',
+                c.future ? 'opacity-50 cursor-not-allowed' : 'hover:ring-1 hover:ring-inset hover:ring-slate-500',
             ].join(' ');
         },
         pickDay(day) {
@@ -329,12 +347,12 @@ export function registerAttendance(Alpine) {
             const avgIn = ins.length ? clock(ins.reduce((a, b) => a + b, 0) / ins.length) : '—';
             if (this.single) {
                 return [
-                    { label: t.Present, value: this.n('ok') + this.n('late'), tone: 'text-slate-900', sub: '' },
-                    { label: t.Late, value: this.n('late'), tone: 'text-amber-600', sub: lateMin ? `${dur(lateMin)} ${t['in total']}` : '' },
-                    { label: t.Absent, value: this.n('absent'), tone: 'text-red-600', sub: '' },
-                    { label: t['On leave'], value: this.n('leave'), tone: 'text-sky-600', sub: '' },
-                    { label: t['Not in yet'], value: rows.filter((r) => r.status === 'not_yet').length, tone: 'text-slate-400', sub: '' },
-                    { label: t['Avg first in'], value: avgIn, tone: 'text-slate-900', sub: '' },
+                    { label: t.Present, value: this.n('ok') + this.n('late'), tone: 'text-slate-900', dot: 'bg-att-ok', sub: '' },
+                    { label: t.Late, value: this.n('late'), tone: 'text-amber-700', dot: 'bg-att-late', sub: lateMin ? `${dur(lateMin)} ${t['in total']}` : '' },
+                    { label: t.Absent, value: this.n('absent'), tone: 'text-red-700', dot: 'bg-att-absent', sub: '' },
+                    { label: t['On leave'], value: this.n('leave'), tone: 'text-blue-700', dot: 'bg-att-leave', sub: '' },
+                    { label: t['Not in yet'], value: rows.filter((r) => r.status === 'not_yet').length, tone: 'text-slate-500', dot: 'bg-slate-300', sub: '' },
+                    { label: t['Avg first in'], value: avgIn, tone: 'text-slate-900', dot: 'bg-brand-600', sub: '' },
                 ];
             }
             const workDays = this.summary.reduce((s, e) => s + e.work_days, 0);
@@ -342,12 +360,12 @@ export function registerAttendance(Alpine) {
             const worked = rows.filter((r) => r.worked_minutes);
             const avgWork = worked.length ? dur(worked.reduce((s, r) => s + r.worked_minutes, 0) / worked.length) : '—';
             return [
-                { label: t.Attendance, value: workDays ? Math.round((present / workDays) * 100) + '%' : '—', tone: 'text-slate-900', sub: `${present} ${t.of} ${workDays} ${t['work days']}` },
-                { label: t['Late arrivals'], value: this.n('late'), tone: 'text-amber-600', sub: lateMin ? `${dur(lateMin)} ${t['in total']}` : '' },
-                { label: t.Absences, value: this.n('absent'), tone: 'text-red-600', sub: t['work days with no punch'] },
-                { label: t['Leave days'], value: this.n('leave'), tone: 'text-sky-600', sub: '' },
-                { label: t['Avg first in'], value: avgIn, tone: 'text-slate-900', sub: '' },
-                { label: t['Avg worked'], value: avgWork, tone: 'text-slate-900', sub: t['first in to last out'] },
+                { label: t.Attendance, value: workDays ? Math.round((present / workDays) * 100) + '%' : '—', tone: 'text-slate-900', dot: 'bg-att-ok', sub: `${present} ${t.of} ${workDays} ${t['work days']}` },
+                { label: t['Late arrivals'], value: this.n('late'), tone: 'text-amber-700', dot: 'bg-att-late', sub: lateMin ? `${dur(lateMin)} ${t['in total']}` : '' },
+                { label: t.Absences, value: this.n('absent'), tone: 'text-red-700', dot: 'bg-att-absent', sub: t['work days with no punch'] },
+                { label: t['Leave days'], value: this.n('leave'), tone: 'text-blue-700', dot: 'bg-att-leave', sub: '' },
+                { label: t['Avg first in'], value: avgIn, tone: 'text-slate-900', dot: 'bg-brand-600', sub: '' },
+                { label: t['Avg worked'], value: avgWork, tone: 'text-slate-900', dot: 'bg-brand-600', sub: t['first in to last out'] },
             ];
         },
         get mainHeight() {
@@ -437,7 +455,7 @@ export function registerAttendance(Alpine) {
             const hours = Array.from({ length: 24 }, (_, h) => h);
             this.chart('hours', {
                 type: 'bar',
-                data: { labels: hours.map((h) => pad(h)), datasets: [{ label: t.Punches, data: hours.map((h) => byHour[h] || 0), backgroundColor: '#14b8a6', borderRadius: 2 }] },
+                data: { labels: hours.map((h) => pad(h)), datasets: [{ label: t.Punches, data: hours.map((h) => byHour[h] || 0), backgroundColor: COLORS.hours, borderRadius: 2 }] },
                 options: { plugins: { legend: { display: false } }, scales: { x: { reverse: cfg.rtl, grid: { display: false } }, y: { beginAtZero: true, position: cfg.rtl ? 'right' : 'left', ticks: { precision: 0 } } } },
             });
         },
@@ -464,7 +482,7 @@ export function registerAttendance(Alpine) {
         },
         get tableSummary() { return this.summary.filter((s) => this.matches(s)); },
         get tableDays() { return this.rows.filter((r) => r.status !== 'weekend' && r.status !== 'holiday' && this.matches(r)).slice(0, 2000); },
-        badgeClass(status) { return BADGE[status] || 'bg-slate-100 text-slate-600 ring-slate-500/20'; },
+        badgeClass(status) { return BADGE[status] || 'bg-slate-100 text-slate-600'; },
         dur,
     };
     });

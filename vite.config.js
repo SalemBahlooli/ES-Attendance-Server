@@ -10,7 +10,7 @@ export default defineConfig({
             refresh: true,
             // Fonts are downloaded at build time and served from /build (no external requests).
             fonts: [
-                bunny('Inter', { weights: [400, 500, 600, 700] }),
+                bunny('IBM Plex Sans', { weights: [400, 500, 600, 700] }),
                 bunny('IBM Plex Sans Arabic', { weights: [400, 500, 600, 700] }),
             ],
         }),

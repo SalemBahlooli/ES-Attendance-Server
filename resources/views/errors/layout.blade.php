@@ -1,10 +1,10 @@
 {{-- Shared look for error pages. Keep it simple: it must render even when the database is down. --}}
 @php
-    try { $appName = setting('app_name', config('app.name')); $brand = setting('primary_color', '#2563eb'); $support = setting('support_email'); }
-    catch (\Throwable $e) { $appName = config('app.name'); $brand = '#2563eb'; $support = null; }
+    try { $appName = setting('app_name', config('app.name')); $brand = setting('primary_color', '#0f6e56'); $support = setting('support_email'); }
+    catch (\Throwable $e) { $appName = config('app.name'); $brand = '#0f6e56'; $support = null; }
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ is_rtl() ? 'rtl' : 'ltr' }}" style="--brand: {{ $brand }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ is_rtl() ? 'rtl' : 'ltr' }}" style="--brand-base: {{ $brand }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

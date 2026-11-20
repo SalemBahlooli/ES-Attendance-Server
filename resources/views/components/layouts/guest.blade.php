@@ -14,7 +14,7 @@
     $logo = setting('logo') ? Storage::disk('public')->url(setting('logo')) : null;
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ is_rtl() ? 'rtl' : 'ltr' }}" style="--brand: {{ setting('primary_color', '#2563eb') }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ is_rtl() ? 'rtl' : 'ltr' }}" style="--brand-base: {{ setting('primary_color', '#0f6e56') }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,6 +23,7 @@
     @if (setting('favicon'))
         <link rel="icon" href="{{ Storage::disk('public')->url(setting('favicon')) }}">
     @endif
+    <script>try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
     @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -39,12 +40,12 @@
         @if ($logo)
             <img src="{{ $logo }}" alt="{{ $appName }}" class="mx-auto max-h-[130px] w-auto max-w-[300px]">
         @else
-            <span class="flex size-14 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-extrabold text-white shadow-[0_8px_18px_color-mix(in_oklab,var(--brand)_32%,transparent)]">{{ mb_strtoupper(mb_substr($appName, 0, 1)) }}</span>
-            <span class="text-lg font-extrabold tracking-[-.2px] text-slate-900">{{ $appName }}</span>
+            <span class="flex size-12 items-center justify-center rounded-xl bg-brand-600 text-2xl text-white"><i class="fa-solid fa-fingerprint"></i></span>
+            <span class="text-lg font-semibold text-slate-900">{{ $appName }}</span>
         @endif
     </a>
 
-    <div class="auth-card {{ $wide ? 'max-w-[640px]' : 'max-w-[540px]' }}">
+    <div class="auth-card {{ $wide ? 'max-w-[560px]' : 'max-w-[400px]' }}">
         @if ($heading)
             <div class="auth-card-head">
                 @if ($icon)
@@ -64,7 +65,7 @@
         <div class="mt-5 space-y-2 text-center text-[13px] text-slate-500">{{ $below }}</div>
     @endisset
 
-    <div class="mt-7 text-center text-[12.5px] font-semibold text-slate-500">
+    <div class="mt-7 text-center text-[13px] text-slate-500">
         {{ setting('footer_text') ?: '© '.date('Y').' '.(setting('company_name') ?: $appName) }}
         @if (setting('support_email'))
             · <a href="mailto:{{ setting('support_email') }}" class="hover:text-slate-700 hover:underline">{{ setting('support_email') }}</a>

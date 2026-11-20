@@ -79,7 +79,7 @@ class SettingsTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         Storage::disk('public')->assertExists(setting('logo'));
-        $this->get('/')->assertSee('--brand: #0f766e', false);
+        $this->get('/')->assertSee('--brand-base: #0f766e', false);
     }
 
     public function test_unknown_keys_are_refused(): void

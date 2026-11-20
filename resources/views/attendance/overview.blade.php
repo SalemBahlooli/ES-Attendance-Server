@@ -37,15 +37,15 @@
         <div class="card space-y-3 p-3">
             <div class="flex flex-wrap gap-1.5">
                 @foreach (['today' => __('Today'), 'yesterday' => __('Yesterday'), 'week' => __('This week'), 'last7' => __('Last 7 days'), 'month' => __('This month'), 'lastmonth' => __('Last month'), 'last30' => __('Last 30 days')] as $key => $label)
-                    <button type="button" class="btn btn-sm" :class="preset === '{{ $key }}' ? 'btn-primary' : 'btn-secondary'" @click="usePreset('{{ $key }}')">{{ $label }}</button>
+                    <button type="button" class="chip" :class="preset === '{{ $key }}' && 'chip-active'" @click="usePreset('{{ $key }}')">{{ $label }}</button>
                 @endforeach
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class="btn btn-secondary px-3" @click="shift(-1)" aria-label="{{ __('Previous period') }}"><i class="fa-solid fa-chevron-left rtl-flip"></i></button>
+                <button type="button" class="btn px-3" @click="shift(-1)" aria-label="{{ __('Previous period') }}"><i class="fa-solid fa-chevron-left rtl-flip"></i></button>
                 <input type="date" class="input w-auto" x-model="from" @change="setRange(from, to)" aria-label="{{ __('From') }}">
                 <span class="text-xs text-slate-400">{{ __('to') }}</span>
                 <input type="date" class="input w-auto" x-model="to" @change="setRange(from, to)" aria-label="{{ __('To') }}">
-                <button type="button" class="btn btn-secondary px-3" @click="shift(1)" aria-label="{{ __('Next period') }}"><i class="fa-solid fa-chevron-right rtl-flip"></i></button>
+                <button type="button" class="btn px-3" @click="shift(1)" aria-label="{{ __('Next period') }}"><i class="fa-solid fa-chevron-right rtl-flip"></i></button>
                 <select class="input w-auto" x-model="dept" @change="pin = ''; load()" aria-label="{{ __('Department') }}">
                     <option value="">{{ __('All departments') }}</option>
                     @foreach ($departments as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach
@@ -68,16 +68,16 @@
                     <strong class="text-sm text-slate-800" x-text="monthTitle"></strong>
                     <button type="button" class="btn-icon size-8" @click="moveMonth(1)" aria-label="{{ __('Next month') }}"><i class="fa-solid fa-chevron-right rtl-flip"></i></button>
                 </div>
-                <div class="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs font-semibold">
-                    <button type="button" class="rounded-md py-1" :class="mode === 'day' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'" @click="mode = 'day'; pending = null">{{ __('Pick a day') }}</button>
-                    <button type="button" class="rounded-md py-1" :class="mode === 'range' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'" @click="mode = 'range'; pending = null">{{ __('Pick a range') }}</button>
+                <div class="seg mb-3 flex">
+                    <button type="button" class="flex-1" :class="mode === 'day' && 'on'" @click="mode = 'day'; pending = null">{{ __('Pick a day') }}</button>
+                    <button type="button" class="flex-1" :class="mode === 'range' && 'on'" @click="mode = 'range'; pending = null">{{ __('Pick a range') }}</button>
                 </div>
                 <div class="grid grid-cols-7 gap-1 text-center text-[11px] text-slate-400">
                     <template x-for="w in t.weekdays"><div x-text="w"></div></template>
                 </div>
                 <div class="mt-1 grid grid-cols-7 gap-1">
                     <template x-for="c in calendarCells" :key="c.key">
-                        <button type="button" class="relative aspect-square rounded-md text-xs tabular-nums transition"
+                        <button type="button" class="relative grid aspect-square place-items-center rounded-lg text-[13px] tabular-nums transition"
                                 :class="c.day ? cellClass(c) : 'invisible'" :disabled="!c.day || c.future"
                                 :title="c.title" @click="pickDay(c.day)" x-text="c.n"></button>
                     </template>
@@ -85,23 +85,23 @@
                 <p class="mt-2 text-xs text-slate-500" x-text="mode === 'range' ? (pending ? t['Click the first day, then the last day.'] : t['Click the first day, then the last day.']) : t['Click a day to open it.']"></p>
                 <div class="mt-3 flex items-center gap-1 text-[11px] text-slate-400">
                     <span>{{ __('Fewer') }}</span>
-                    <i class="size-3 rounded-sm bg-teal-100"></i><i class="size-3 rounded-sm bg-teal-200"></i><i class="size-3 rounded-sm bg-teal-300"></i><i class="size-3 rounded-sm bg-teal-400"></i><i class="size-3 rounded-sm bg-teal-600"></i>
+                    <i class="size-3.5 rounded bg-heat-1"></i><i class="size-3.5 rounded bg-heat-2"></i><i class="size-3.5 rounded bg-heat-3"></i><i class="size-3.5 rounded bg-heat-4"></i><i class="size-3.5 rounded bg-heat-5"></i>
                     <span>{{ __('More employees') }}</span>
                 </div>
             </aside>
 
             <div class="min-w-0 space-y-4">
                 <div>
-                    <h2 class="text-lg font-bold text-slate-900" x-text="periodTitle"></h2>
+                    <h2 class="text-xl font-semibold text-slate-900" x-text="periodTitle"></h2>
                     <p class="text-xs text-slate-500" x-text="periodSub"></p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
                     <template x-for="s in stats" :key="s.label">
-                        <div class="card p-4">
-                            <div class="truncate text-xs font-medium text-slate-500" x-text="s.label"></div>
-                            <div class="text-2xl font-semibold tracking-tight tabular-nums" :class="s.tone" x-text="s.value"></div>
-                            <div class="truncate text-xs text-slate-400" x-text="s.sub"></div>
+                        <div class="card px-4 py-3.5">
+                            <div class="flex items-center gap-1.5 truncate text-[13px] text-slate-500"><span class="dot" :class="s.dot"></span><span x-text="s.label"></span></div>
+                            <div class="text-[26px] leading-tight font-semibold tabular-nums" :class="s.tone" x-text="s.value"></div>
+                            <div class="truncate text-xs text-slate-500" x-text="s.sub"></div>
                         </div>
                     </template>
                 </div>
@@ -109,7 +109,7 @@
                 <div class="card p-4">
                     <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
                         <div>
-                            <h3 class="text-sm font-bold text-slate-800" x-text="single ? t['Day timeline'] : t['Daily attendance']"></h3>
+                            <h3 class="text-[15px] font-semibold text-slate-900" x-text="single ? t['Day timeline'] : t['Daily attendance']"></h3>
                             <p class="text-xs text-slate-500" x-text="single ? t['First punch to last punch per employee'] : t['By status, per day']"></p>
                         </div>
                     </div>
@@ -121,12 +121,12 @@
 
         <div class="grid gap-4 lg:grid-cols-2">
             <div class="card p-4">
-                <h3 class="text-sm font-bold text-slate-800">{{ __('Arrival times') }}</h3>
+                <h3 class="text-[15px] font-semibold text-slate-900">{{ __('Arrival times') }}</h3>
                 <p class="mb-2 text-xs text-slate-500">{{ __('First punch per employee per day, in 30-minute slots') }}</p>
                 <div class="relative h-64"><canvas x-ref="arrival"></canvas></div>
             </div>
             <div class="card p-4">
-                <h3 class="text-sm font-bold text-slate-800">{{ __('Punches by hour') }}</h3>
+                <h3 class="text-[15px] font-semibold text-slate-900">{{ __('Punches by hour') }}</h3>
                 <p class="mb-2 text-xs text-slate-500">{{ __('All punches in the period by hour of day') }}</p>
                 <div class="relative h-64"><canvas x-ref="hours"></canvas></div>
             </div>
@@ -136,15 +136,15 @@
         <div class="card p-4" x-show="!single && mapEmployees.length">
             <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
                 <div>
-                    <h3 class="text-sm font-bold text-slate-800">{{ __('Attendance map') }}</h3>
+                    <h3 class="text-[15px] font-semibold text-slate-900">{{ __('Attendance map') }}</h3>
                     <p class="text-xs text-slate-500">{{ __('One square per employee per day. Hover for details, click to open the day.') }}</p>
                 </div>
                 <div class="flex flex-wrap gap-3 text-xs text-slate-500">
-                    <span class="flex items-center gap-1"><i class="size-3 rounded-sm bg-emerald-500"></i>{{ __('Present') }}</span>
-                    <span class="flex items-center gap-1"><i class="size-3 rounded-sm bg-amber-400"></i>{{ __('Late') }}</span>
-                    <span class="flex items-center gap-1"><i class="size-3 rounded-sm bg-sky-400"></i>{{ __('On leave') }}</span>
-                    <span class="flex items-center gap-1"><i class="size-3 rounded-sm bg-rose-400"></i>{{ __('Absent') }}</span>
-                    <span class="flex items-center gap-1"><i class="size-3 rounded-sm bg-slate-200"></i>{{ __('Day off') }}</span>
+                    <span class="flex items-center gap-1.5"><i class="size-2.5 rounded-[3px] bg-att-ok"></i>{{ __('Present') }}</span>
+                    <span class="flex items-center gap-1.5"><i class="size-2.5 rounded-[3px] bg-att-late"></i>{{ __('Late') }}</span>
+                    <span class="flex items-center gap-1.5"><i class="size-2.5 rounded-[3px] bg-att-leave"></i>{{ __('On leave') }}</span>
+                    <span class="flex items-center gap-1.5"><i class="size-2.5 rounded-[3px] bg-att-absent"></i>{{ __('Absent') }}</span>
+                    <span class="flex items-center gap-1.5"><i class="size-2.5 rounded-[3px] bg-att-off ring-1 ring-slate-200"></i>{{ __('Day off') }}</span>
                 </div>
             </div>
             <div class="overflow-x-auto">
@@ -172,9 +172,9 @@
         {{-- Table --}}
         <div class="card">
             <div class="flex flex-wrap items-center gap-2 border-b border-slate-100 p-3">
-                <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 text-xs font-semibold">
-                    <button type="button" class="rounded-md px-3 py-1" :class="view === 'employee' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'" @click="view = 'employee'">{{ __('By employee') }}</button>
-                    <button type="button" class="rounded-md px-3 py-1" :class="view === 'day' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'" @click="view = 'day'">{{ __('Day by day') }}</button>
+                <div class="seg">
+                    <button type="button" :class="view === 'employee' && 'on'" @click="view = 'employee'">{{ __('By employee') }}</button>
+                    <button type="button" :class="view === 'day' && 'on'" @click="view = 'day'">{{ __('Day by day') }}</button>
                 </div>
                 <span class="flex-1"></span>
                 <input type="search" class="input max-w-xs" x-model="search" placeholder="{{ __('Search name or ID') }}" aria-label="{{ __('Search') }}">
@@ -212,7 +212,7 @@
                                 <td class="tabular-nums" dir="ltr" x-text="r.last_out ? r.last_out.slice(11, 16) : ''"></td>
                                 <td class="tabular-nums" x-text="dur(r.worked_minutes)"></td>
                                 <td class="tabular-nums" x-text="r.late_minutes || ''"></td>
-                                <td><span class="badge ring-1 ring-inset" :class="badgeClass(r.status)" x-text="t.statuses[r.status] || ''"></span></td>
+                                <td><span class="badge" :class="badgeClass(r.status)" x-text="t.statuses[r.status] || ''"></span></td>
                             </tr>
                         </template>
                     </tbody>

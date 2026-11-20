@@ -51,6 +51,27 @@ class Menu
      *
      * @return array<int, array{label: string, icon: string, url: string}>
      */
+    /**
+     * Phones: up to four links for the bottom bar (items with 'bottom' => true,
+     * else the first links) and everything else for its "More" sheet.
+     *
+     * @return array{0: array<int, array>, 1: array<int, array>}
+     */
+    public static function bottomBar(array $menu, int $slots = 4): array
+    {
+        $links = collect($menu)
+            ->flatMap(fn ($item) => isset($item['children']) ? $item['children'] : [$item])
+            ->filter(fn ($item) => isset($item['url']))
+            ->values();
+        $bottom = $links->filter(fn ($item) => ! empty($item['bottom']))->take($slots);
+        if ($bottom->isEmpty()) {
+            $bottom = $links->take($slots);
+        }
+        $urls = $bottom->pluck('url')->all();
+
+        return [$bottom->values()->all(), $links->reject(fn ($item) => in_array($item['url'], $urls, true))->values()->all()];
+    }
+
     public static function creatable(array $menu, ?User $user): array
     {
         return collect($menu)

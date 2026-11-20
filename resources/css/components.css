@@ -1,256 +1,247 @@
 /*
- | The look of the app: a light slate surface with one blue accent (the brand
- | color from Settings → Branding). White top bar, white icon rail with fly-out
- | menus, white cards with a hairline border and a soft shadow.
- |
- | Edit the classes here to re-skin every page at once.
+ | The pieces every page is built from, in the ES Attendance look: flat white
+ | cards with a thin warm border, rounded 10px controls, one green accent.
+ | Colours come from theme.css, so all of this follows dark mode too.
  */
 @layer components {
     /* ------------------------------------------------------------ cards */
     .card {
-        @apply rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,.05)];
+        @apply rounded-xl border border-slate-200 bg-white;
     }
     .card-header {
-        @apply flex items-center justify-between gap-3 border-b border-[#eef2f6] px-5 py-3.5;
+        @apply flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3;
     }
     .card-title {
-        @apply text-sm font-bold text-slate-800;
+        @apply text-[15px] font-semibold text-slate-900;
     }
     .card-body {
-        @apply p-5;
+        @apply p-[18px];
     }
 
-    /* Page title card (drawn by the app layout) */
+    /* The row under the title bar: subtitle, breadcrumbs and the page's buttons */
     .page-head {
-        @apply mb-4 flex flex-wrap items-center gap-4 rounded-[14px] border border-[#e6ebf2] bg-white px-5 py-4 shadow-[0_1px_3px_rgba(15,23,42,.05)];
-    }
-    .page-head-icon {
-        @apply flex size-[46px] shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xl text-brand-600;
-    }
-    .page-head h1 {
-        @apply text-lg leading-tight font-extrabold tracking-[-.2px] text-slate-900;
+        @apply mb-4 flex flex-wrap items-center gap-x-4 gap-y-2;
     }
     .page-head .sub {
-        @apply mt-[3px] text-xs font-semibold text-slate-400;
+        @apply text-sm text-slate-500;
     }
 
     /* ---------------------------------------------------------- buttons */
     .btn {
-        @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors focus:outline-none disabled:pointer-events-none disabled:opacity-50;
+        @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium whitespace-nowrap text-slate-900 transition-colors hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/40 disabled:pointer-events-none disabled:opacity-55;
     }
     .btn-sm {
-        @apply px-2.5 py-1.5 text-xs;
+        @apply rounded-lg px-2.5 py-1 text-[13px];
     }
     .btn-primary {
-        @apply border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700 focus-visible:ring-3 focus-visible:ring-brand-600/25;
+        @apply border-brand-600 bg-brand-600 text-white hover:border-brand-700 hover:bg-brand-700;
     }
     .btn-secondary {
-        @apply border-[#e2e8f0] bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-3 focus-visible:ring-slate-300/40;
+        @apply bg-white text-slate-900 hover:bg-slate-100;
     }
     .btn-ghost {
-        @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+        @apply border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900;
     }
     .btn-danger {
-        @apply border-red-500 bg-red-500 text-white hover:border-red-600 hover:bg-red-600 focus-visible:ring-3 focus-visible:ring-red-500/25;
+        @apply border-red-600 bg-red-600 text-white hover:bg-red-700;
     }
     .btn-danger-soft {
-        @apply border-red-200 bg-white text-red-600 hover:bg-red-50;
+        @apply text-red-700 hover:border-red-200 hover:bg-red-50;
     }
     .btn-success {
-        @apply border-green-500 bg-green-500 text-white hover:border-green-600 hover:bg-green-600;
+        @apply border-green-600 bg-green-600 text-white hover:bg-green-700;
     }
     .btn-icon {
-        @apply inline-flex size-9 cursor-pointer items-center justify-center rounded-[10px] text-slate-500 transition-colors hover:bg-brand-50 hover:text-brand-600;
+        @apply inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900;
+    }
+
+    /* Round preset chips (Today, This month...) */
+    .chip {
+        @apply inline-flex cursor-pointer items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[13px] whitespace-nowrap text-slate-900 transition-colors hover:bg-slate-100;
+    }
+    .chip-active,
+    .chip-active:hover {
+        @apply border-brand-600 bg-brand-600 text-white;
+    }
+
+    /* Two or three options in a pill (Pick a day | Pick a range) */
+    .seg {
+        @apply inline-flex gap-0.5 rounded-full border border-slate-200 bg-slate-100 p-0.5;
+    }
+    .seg > button {
+        @apply cursor-pointer rounded-full px-3 py-1 text-[13px] whitespace-nowrap text-slate-500 hover:text-slate-900;
+    }
+    .seg > button.on {
+        @apply bg-white font-medium text-slate-900 ring-1 ring-slate-200;
     }
 
     /* ------------------------------------------------------------ forms */
     .label {
-        @apply mb-1.5 block text-[12.5px] font-semibold text-slate-600;
+        @apply mb-1 block text-[13px] text-slate-500;
     }
     .input {
-        @apply block w-full rounded-[9px] border-[#e2e8f0] bg-white text-sm text-slate-900 shadow-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-3 focus:ring-brand-600/15 disabled:bg-slate-50 disabled:text-slate-500;
+        @apply block w-full rounded-[10px] border-slate-200 bg-white px-3 py-2 text-[15px] text-slate-900 shadow-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-1 focus:ring-brand-600 disabled:bg-slate-100 disabled:text-slate-500;
     }
     .input-error {
-        @apply border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-500/15;
+        @apply border-red-400 focus:border-red-500 focus:ring-red-500;
     }
     .help {
-        @apply mt-1.5 text-xs text-slate-500;
+        @apply mt-1 text-xs text-slate-500;
     }
     .error {
-        @apply mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600;
+        @apply mt-1 inline-flex items-center gap-1.5 text-[13px] font-medium text-red-700;
     }
     .checkbox {
-        @apply size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600/30;
+        @apply size-4 rounded border-slate-300 bg-white text-brand-600 focus:ring-brand-600/30;
     }
 
     /* ----------------------------------------------------------- tables */
     .table {
-        @apply w-full text-[13px];
+        @apply w-full text-sm;
     }
     .table thead th {
-        @apply border-b border-[#eef2f6] bg-[#fafbfc] px-4 py-2.5 text-start text-[11px] font-bold tracking-[.4px] text-slate-400 uppercase;
+        @apply border-b border-slate-200 bg-slate-100 px-3.5 py-2.5 text-start text-[13px] font-medium whitespace-nowrap text-slate-500;
     }
     .table tbody td {
-        @apply border-t border-[#f4f6f9] px-4 py-3 align-middle;
+        @apply border-b border-slate-200 px-3.5 py-2.5 align-middle whitespace-nowrap;
+    }
+    .table tbody tr:last-child td {
+        @apply border-b-0;
     }
     .table tbody tr {
-        @apply transition-colors hover:bg-[#f6f9fc];
+        @apply transition-colors hover:bg-slate-50;
     }
 
     .badge {
-        @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap;
+        @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap;
     }
 
     /* ------------------------------------------------------------- tabs */
     .tab {
-        @apply -mb-px inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 text-sm font-semibold whitespace-nowrap text-slate-500 hover:border-slate-300 hover:text-slate-700;
+        @apply -mb-px inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-3 text-sm font-medium whitespace-nowrap text-slate-500 hover:border-slate-300 hover:text-slate-900;
     }
     .tab-active {
         @apply border-brand-600 text-brand-700 hover:border-brand-600 hover:text-brand-700;
     }
 
     .kbd {
-        @apply rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-xs text-slate-600;
+        @apply rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600;
+    }
+    code {
+        @apply rounded-md bg-slate-100 px-1.5 py-px font-mono text-[13px];
     }
 
     /* ------------------------------------------------- dropdown menus */
     .menu-panel {
-        @apply overflow-hidden rounded-xl border border-[#eef2f6] bg-white p-1.5 shadow-[0_12px_34px_rgba(15,23,42,.14)];
+        @apply overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_8px_30px_rgba(0,0,0,.15)];
     }
     .menu-item {
-        @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] whitespace-nowrap text-slate-700 hover:bg-slate-100 hover:text-slate-900;
+        @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap text-slate-700 hover:bg-slate-100 hover:text-slate-900;
     }
     .menu-heading {
-        @apply px-3 pt-2 pb-1 text-[11px] font-bold tracking-[.4px] text-slate-400 uppercase;
+        @apply px-3 pt-2 pb-1 text-xs text-slate-500;
     }
 
     /* ---------------------------------------------------------- top bar */
     .topbar-link {
-        @apply relative flex h-10 items-center gap-2 rounded-[10px] px-3 text-slate-500 transition-colors hover:bg-brand-50 hover:text-brand-600;
+        @apply relative flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900;
     }
     .topbar-link-active {
-        @apply bg-brand-50 text-brand-600 shadow-[inset_0_-2px_0_var(--brand)];
+        @apply bg-brand-50 text-brand-700;
     }
 
-    /* ------------------------------------------------------- side rail */
-    .rail-link {
-        @apply relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:justify-center lg:rounded-none lg:px-0 lg:py-3;
+    /* ---------------------------------------------------------- sidebar */
+    .nav-label {
+        @apply px-3 pt-3.5 pb-1.5 text-xs text-slate-500;
     }
-    .rail-link > i {
-        @apply w-5 text-center text-sm text-slate-400 transition-colors;
+    .nav-item {
+        @apply flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-[9px] text-start text-[15px] text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900;
     }
-    .rail-link:hover > i {
-        @apply text-slate-600;
+    .nav-item > i:first-child {
+        @apply w-[18px] shrink-0 text-center text-[15px];
     }
-    .rail-link-active,
-    .rail-link-active:hover {
-        @apply bg-brand-50 font-semibold text-brand-700;
+    .nav-item-active,
+    .nav-item-active:hover {
+        @apply bg-brand-50 font-medium text-brand-700;
     }
-    .rail-link-active > i,
-    .rail-link-active:hover > i {
-        @apply text-brand-600;
+    .nav-sub {
+        @apply flex items-center gap-2 rounded-lg py-1.5 ps-[42px] pe-3 text-sm text-slate-500 hover:bg-slate-100 hover:text-slate-900;
     }
-    /* the fly-out shown next to an icon on large screens */
-    .rail-flyout {
-        @apply invisible absolute start-full top-0 z-50 min-w-52 overflow-hidden rounded-e-lg border border-[#e8edf2] bg-white opacity-0 shadow-[0_8px_22px_rgba(15,23,42,.12)] transition-opacity duration-100;
+    .nav-sub-active,
+    .nav-sub-active:hover {
+        @apply font-medium text-brand-700;
     }
-    .rail-item:hover > .rail-flyout,
-    .rail-item:focus-within > .rail-flyout {
-        @apply visible opacity-100;
+
+    /* Phones: the bar at the bottom */
+    .bottom-link {
+        @apply flex flex-1 cursor-pointer flex-col items-center gap-[3px] px-0.5 pt-2.5 pb-2 text-[11px] text-slate-500;
     }
-    .rail-sublink {
-        @apply flex items-center gap-2.5 rounded-[7px] px-3 py-1.5 text-[12.5px] text-slate-500 hover:bg-slate-100 hover:text-slate-900;
+    .bottom-link > i {
+        @apply text-[19px];
     }
-    .rail-sublink-active,
-    .rail-sublink-active:hover {
-        @apply bg-brand-50 font-semibold text-brand-700;
+    .bottom-link-active {
+        @apply font-medium text-brand-700;
+    }
+
+    /* Status dot in front of a figure's label */
+    .dot {
+        @apply inline-block size-2 shrink-0 rounded-full;
     }
 }
 
 /* ---------------------------------------------------------------- sign-in
- | Pages before sign-in: a faint dot grid on a soft blue gradient, with a
- | light that eases toward the cursor (resources/js/app.js), and a frosted card.
+ | Pages before sign-in: the plain page colour and one small card, like the
+ | original attendance app.
  */
 .auth-page {
-    background: linear-gradient(160deg, #eaf0fb 0%, #f5f8fe 48%, #e8eefb 100%);
+    background: var(--page);
 }
 .auth-bg {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    overflow: hidden;
-    pointer-events: none;
-    --mx: 50%;
-    --my: 30%;
-    background:
-        radial-gradient(720px 520px at 14% 10%, color-mix(in oklab, var(--brand) 12%, transparent) 0%, transparent 60%),
-        radial-gradient(700px 540px at 88% 88%, rgba(99, 102, 241, 0.11) 0%, transparent 60%),
-        linear-gradient(160deg, #eef3fb 0%, #f6f9fe 50%, #eaf0fb 100%);
-}
-.auth-bg::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(30, 41, 59, 0.11) 1.2px, transparent 1.6px);
-    background-size: 26px 26px;
-    mask-image: radial-gradient(130% 120% at 50% 0%, #000 35%, transparent 82%);
-}
-.auth-bg::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-        520px 520px at var(--mx) var(--my),
-        color-mix(in oklab, var(--brand) 20%, transparent) 0%,
-        color-mix(in oklab, var(--brand) 8%, transparent) 34%,
-        transparent 62%
-    );
+    display: none;
 }
 
 @layer components {
     .auth-card {
-        @apply w-full overflow-hidden rounded-[18px] border border-[#e2e8f0]/90 bg-white/90 shadow-[0_20px_50px_rgba(15,23,42,.1),0_2px_6px_rgba(15,23,42,.04)] backdrop-blur-md;
+        @apply w-full overflow-hidden rounded-2xl border border-slate-200 bg-white;
     }
     .auth-card-head {
-        @apply px-6 pt-7 pb-1.5 text-center sm:px-11 sm:pt-9;
+        @apply px-7 pt-7 pb-1 text-center;
     }
     .auth-card-head h1 {
-        @apply text-[22px] leading-tight font-extrabold tracking-[-.3px] text-slate-900;
+        @apply text-xl leading-tight font-semibold text-slate-900;
     }
     .auth-card-head p {
-        @apply mt-1.5 text-[13px] text-slate-500;
+        @apply mt-1 text-sm text-slate-500;
     }
     .auth-card-body {
-        @apply px-6 pt-6 pb-7 sm:px-11 sm:pb-8;
+        @apply px-7 pt-5 pb-7;
     }
-
-    /* inputs inside the card: taller, soft fill, icon at the start */
     .auth-card .input {
-        @apply h-12 rounded-[11px] bg-slate-50 focus:bg-white;
+        @apply h-11;
     }
     .auth-card .input.ps-10 {
-        @apply ps-[42px];
+        @apply ps-10;
     }
     .auth-card .btn-primary.w-full {
-        @apply h-[50px] rounded-[11px] text-[15px] font-bold tracking-[.2px] shadow-[0_8px_18px_color-mix(in_oklab,var(--brand)_32%,transparent)] hover:shadow-[0_10px_22px_color-mix(in_oklab,var(--brand)_40%,transparent)] active:translate-y-px;
+        @apply h-11 text-[15px];
     }
     .auth-link {
-        @apply text-[13px] font-semibold text-brand-600 hover:text-brand-700 hover:underline;
+        @apply text-[13px] font-medium text-brand-700 hover:underline;
     }
 
     /* segmented "Password | Authenticator code" switch */
     .auth-method {
-        @apply grid grid-cols-2 gap-1 rounded-xl border border-[#e2e8f0] bg-slate-100 p-1;
+        @apply grid grid-cols-2 gap-0.5 rounded-full border border-slate-200 bg-slate-100 p-0.5;
     }
     .auth-method button {
-        @apply flex h-[38px] cursor-pointer items-center justify-center gap-2 rounded-[9px] px-2.5 text-[13px] font-bold whitespace-nowrap text-slate-500 transition hover:text-slate-700;
+        @apply flex h-9 cursor-pointer items-center justify-center gap-2 rounded-full px-2.5 text-[13px] whitespace-nowrap text-slate-500 transition hover:text-slate-900;
     }
     .auth-method button[aria-pressed='true'] {
-        @apply bg-white text-brand-700 shadow-[0_1px_3px_rgba(15,23,42,.10),0_0_0_1px_rgba(226,232,240,.95)];
+        @apply bg-white font-medium text-slate-900 ring-1 ring-slate-200;
     }
 
     .auth-otp {
-        @apply text-center font-mono text-[22px] font-extrabold tracking-[.42em] tabular-nums placeholder:font-semibold placeholder:text-slate-300;
+        @apply text-center font-mono text-[22px] font-bold tracking-[.42em] tabular-nums placeholder:font-semibold placeholder:text-slate-300;
     }
 
     .spinner {

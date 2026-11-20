@@ -54,6 +54,9 @@ CI runs the same four checks.
 - `punches.punch_time` is the device's local clock, stored as it arrives and never converted. Read it with `Punch::time()`
   and show it as is (not `format_datetime()`). "Now" and "today" for attendance come from `App\Services\Attendance\Clock`
   (the system time zone setting). Show calendar dates with `format_day()`.
+- The look (the original ES Attendance design) lives in `resources/css/theme.css` and `components.css`: warm neutrals,
+  one green accent, dark mode that follows the device or the account menu. Use `slate-*`, `white` and the status colours
+  (and `bg-att-ok|late|leave|absent|off`, `bg-heat-1..5` for attendance); they all switch in dark mode. Never hard-code hex colours.
 - One punch per employee per second: the unique key is `(pin, punch_time)`. Deleting a punch is a soft delete so the
   device cannot send it back. `Punch` has no `LogsActivity` (thousands of rows); manual changes call `Activity::log()`.
 - All attendance rules live in `App\Services\Attendance\Calculator::compute()`. Pages, exports and the dashboard all use it.

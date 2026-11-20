@@ -98,7 +98,7 @@ Alpine.data('copy', (text) => ({
 
 Alpine.data('chart', (config) => ({
     init() {
-        const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#2563eb';
+        const brand = getComputedStyle(document.documentElement).getPropertyValue('--color-brand-600').trim() || '#0f6e56';
         config.data.datasets.forEach((ds, i) => {
             ds.borderColor ??= i === 0 ? brand : '#ef4444';
             ds.backgroundColor ??= i === 0 ? brand + '22' : '#ef444422';

@@ -85,7 +85,7 @@ return [
                     'help' => 'A square PNG or ICO, at least 64×64.',
                 ],
                 'primary_color' => [
-                    'type' => 'color', 'label' => 'Main color', 'default' => '#2563eb',
+                    'type' => 'color', 'label' => 'Main color', 'default' => '#0f6e56',
                     'help' => 'Buttons, links and highlights.',
                 ],
                 'header_brand' => [
