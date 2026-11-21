@@ -20,7 +20,8 @@
                             @if ($shift->is_default)<x-badge color="brand">{{ __('Default') }}</x-badge>@endif
                             @if ($shift->isFlexible())<x-badge color="teal">{{ __('Flexible: :h a day', ['h' => \App\Services\Attendance\Calculator::duration($shift->requiredMinutes())]) }}</x-badge>@endif
                         </div>
-                        <p class="mt-1 text-sm text-slate-600"><span dir="ltr">{{ $shift->start() }} – {{ $shift->end() }}</span> · {{ __('Late grace :n min', ['n' => $shift->grace_in]) }} · {{ __('Early leave grace :n min', ['n' => $shift->grace_out]) }}</p>
+                        <p class="mt-1 text-sm text-slate-600"><span dir="ltr">{{ $shift->start() }} – {{ $shift->end() }}</span> · {{ __('Late grace :n min', ['n' => $shift->grace_in]) }} · {{ __('Early leave grace :n min', ['n' => $shift->grace_out]) }}
+                            @if ($shift->breakStart()) · {{ $shift->break_paid ? __('Paid break :n min at :t', ['n' => $shift->break_minutes, 't' => $shift->breakStart()]) : __('Unpaid break :n min at :t', ['n' => $shift->break_minutes, 't' => $shift->breakStart()]) }} @endif</p>
                         <p class="mt-0.5 text-xs text-slate-500">{{ __('Weekend') }}: {{ $shift->weekendLabel() }} · {{ __(':e employees, :d departments', ['e' => $shift->employees_count, 'd' => $shift->departments_count]) }}</p>
                     </div>
                     <div class="flex flex-wrap gap-2">

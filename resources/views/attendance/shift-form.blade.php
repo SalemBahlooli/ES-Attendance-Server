@@ -30,6 +30,23 @@
             <input id="shift-go-{{ $id }}" type="number" min="0" max="600" name="grace_out" class="input" value="{{ $old('grace_out', $shift->grace_out ?? 0) }}" required>
         </div>
     </div>
+    <div class="rounded-lg border border-slate-200 p-3">
+        <div class="grid grid-cols-2 gap-3 sm:max-w-sm">
+            <div>
+                <label class="label" for="shift-bs-{{ $id }}">{{ __('Break starts') }}</label>
+                <input id="shift-bs-{{ $id }}" type="time" name="break_start" class="input" value="{{ $old('break_start', $shift->breakStart()) }}" dir="ltr">
+            </div>
+            <div>
+                <label class="label" for="shift-bm-{{ $id }}">{{ __('Break (min)') }}</label>
+                <input id="shift-bm-{{ $id }}" type="number" min="0" max="600" name="break_minutes" class="input" value="{{ $old('break_minutes', $shift->break_minutes ?: null) }}" placeholder="0">
+            </div>
+        </div>
+        <label class="mt-3 flex items-center gap-2 text-sm font-medium text-slate-900">
+            <input type="hidden" name="break_paid" value="0">
+            <input type="checkbox" name="break_paid" value="1" class="checkbox" @checked((bool) $old('break_paid', $shift->break_paid))>{{ __('Break counts as work time') }}
+        </label>
+        <p class="help">{{ __('Unticked: the break is taken off the worked hours of anyone in at that time.') }}</p>
+    </div>
     <div>
         <span class="label">{{ __('Weekend') }}</span>
         <div class="flex flex-wrap gap-1.5">
@@ -52,7 +69,7 @@
                 <label class="label" for="shift-req-{{ $id }}">{{ __('Hours to work per day') }}</label>
                 <input id="shift-req-{{ $id }}" type="number" min="0.5" max="24" step="0.25" name="required_hours" class="input"
                        value="{{ $old('required_hours', $shift->required_minutes ? round($shift->required_minutes / 60, 2) : null) }}"
-                       placeholder="{{ $shift->exists ? round($shift->lengthMinutes() / 60, 2) : 8 }}">
+                       placeholder="{{ $shift->exists ? round($shift->workMinutes() / 60, 2) : 8 }}">
                 <p class="help">{{ __('Empty = from start to end.') }}</p>
             </div>
         </div>

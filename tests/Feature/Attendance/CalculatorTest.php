@@ -135,4 +135,38 @@ class CalculatorTest extends TestCase
         $this->assertSame(1, $sum['late_count']);
         $this->assertSame(20, $sum['late_minutes']);
     }
+
+    public function test_an_unpaid_break_comes_off_the_worked_time_and_a_paid_one_does_not(): void
+    {
+        // 08:00-17:30 with a one-hour break at 12:00: 8.5 hours of work
+        $this->shift->update(['end_time' => '17:30', 'break_start' => '12:00', 'break_minutes' => 60, 'break_paid' => false]);
+        $this->punch('1', '2026-11-16 08:00:00', '2026-11-16 17:30:00'); // the whole day
+        $this->punch('1', '2026-11-17 08:00:00', '2026-11-17 12:30:00'); // left in the middle of the break
+        $this->punch('1', '2026-11-18 13:00:00', '2026-11-18 17:30:00'); // came after the break
+
+        $this->assertSame(510, $this->day('1', '2026-11-16')['worked_minutes']);
+        $this->assertSame(240, $this->day('1', '2026-11-17')['worked_minutes']);
+        $this->assertSame(270, $this->day('1', '2026-11-18')['worked_minutes']);
+        $this->assertSame(510, $this->shift->fresh()->workMinutes());
+
+        $this->shift->update(['break_paid' => true]);
+        $this->assertSame(570, $this->day('1', '2026-11-16')['worked_minutes']);
+        $this->assertSame(570, $this->shift->fresh()->workMinutes());
+    }
+
+    public function test_the_break_is_set_on_the_shift_form(): void
+    {
+        $this->signInWith(['shifts.manage']);
+        $base = ['name' => 'Standard', 'start_time' => '08:00', 'end_time' => '17:30', 'grace_in' => 15, 'grace_out' => 0, 'weekend' => [5, 6]];
+
+        $this->put(route('shifts.update', $this->shift), $base + ['break_minutes' => 60])->assertSessionHasErrors('break_start', null, 'shift'.$this->shift->id);
+
+        $this->put(route('shifts.update', $this->shift), $base + ['break_start' => '12:00', 'break_minutes' => 60, 'break_paid' => 0])->assertSessionHasNoErrors();
+        $shift = $this->shift->fresh();
+        $this->assertSame(['12:00', 60, false], [$shift->breakStart(), $shift->break_minutes, $shift->break_paid]);
+        $this->get(route('shifts.index'))->assertOk()->assertSee(__('Unpaid break :n min at :t', ['n' => 60, 't' => '12:00']));
+
+        $this->put(route('shifts.update', $this->shift), $base + ['break_start' => '12:00', 'break_minutes' => 60, 'break_paid' => 1]);
+        $this->assertTrue($this->shift->fresh()->break_paid);
+    }
 }

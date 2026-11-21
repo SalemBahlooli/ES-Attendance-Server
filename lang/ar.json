@@ -1280,5 +1280,11 @@
     "Select :name": "تحديد :name",
     "Select all on this page": "تحديد الكل في هذه الصفحة",
     "user.dat: :names names, :matched match these employees, :fill will be added.": "user.dat: ‏:names اسمًا، :matched منها تطابق هؤلاء الموظفين، وسيُضاف :fill.",
-    "Will be added": "سيُضاف"
+    "Will be added": "سيُضاف",
+    "Break starts": "بداية البريك",
+    "Break (min)": "مدة البريك (دقيقة)",
+    "Break counts as work time": "البريك يُحسب من ساعات العمل",
+    "Unticked: the break is taken off the worked hours of anyone in at that time.": "بدون تحديد: يُخصم البريك من ساعات العمل لمن كان موجوداً وقته.",
+    "Paid break :n min at :t": "بريك مدفوع :n دقيقة الساعة :t",
+    "Unpaid break :n min at :t": "بريك غير محسوب :n دقيقة الساعة :t"
 }

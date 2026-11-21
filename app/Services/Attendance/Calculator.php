@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  *    5 minutes apart are one punch (a double tap).
  *  - Late = first punch later than start + grace (counted in full minutes).
  *    Early leave = last punch earlier than end - grace.
+ *  - A break that does not count as work time is taken off the worked time, for the
+ *    part of it the employee was in (not under special working hours).
  *  - Public holidays and weekend days are days off; punching on one is "worked day off".
  *  - Without a start date, days before the employee's first punch are not counted.
  *
@@ -179,10 +181,14 @@ class Calculator
                     }
                 }
                 $startMin = $this->minutes($start);
+                // Unpaid break: minutes after the shift start, and its length
+                $breakMin = $special ? 0 : $s->unpaidBreakMinutes();
 
                 return [
                     'shift' => $s, 'start' => $start, 'end' => $end, 'special' => $special, 'startMin' => $startMin,
                     'lengthMin' => (($this->minutes($end) - $startMin + 1440) % 1440) ?: 1440,
+                    'breakAfter' => $breakMin ? ($this->minutes($s->breakStart()) - $startMin + 1440) % 1440 : 0,
+                    'breakMin' => $breakMin,
                 ];
             };
 
@@ -255,7 +261,12 @@ class Calculator
                     $row['first_in'] = Clock::stamp($first);
                     if ($hasOut) {
                         $row['last_out'] = Clock::stamp($last);
-                        $row['worked_minutes'] = intdiv($last - $first, self::MIN);
+                        $worked = $last - $first;
+                        if ($dayInfo['breakMin']) {
+                            $breakFrom = $start + $dayInfo['breakAfter'] * self::MIN;
+                            $worked -= max(0, min($last, $breakFrom + $dayInfo['breakMin'] * self::MIN) - max($first, $breakFrom));
+                        }
+                        $row['worked_minutes'] = intdiv($worked, self::MIN);
                     }
                     if ($off) {
                         $row['status'] = 'offday_work';

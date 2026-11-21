@@ -17,7 +17,7 @@ class Shift extends Model
 
     public const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    protected $fillable = ['name', 'start_time', 'end_time', 'grace_in', 'grace_out', 'weekend', 'is_default', 'flexible', 'required_minutes'];
+    protected $fillable = ['name', 'start_time', 'end_time', 'grace_in', 'grace_out', 'weekend', 'is_default', 'flexible', 'required_minutes', 'break_start', 'break_minutes', 'break_paid'];
 
     protected function casts(): array
     {
@@ -28,6 +28,8 @@ class Shift extends Model
             'grace_out' => 'integer',
             'flexible' => 'boolean',
             'required_minutes' => 'integer',
+            'break_minutes' => 'integer',
+            'break_paid' => 'boolean',
         ];
     }
 
@@ -71,10 +73,28 @@ class Shift extends Model
         return (($m($this->end()) - $m($this->start()) + 1440) % 1440) ?: 1440;
     }
 
+    /** "12:00", or null when the shift has no break. */
+    public function breakStart(): ?string
+    {
+        return $this->break_start && $this->break_minutes > 0 ? substr((string) $this->break_start, 0, 5) : null;
+    }
+
+    /** Break minutes taken off the worked time (0 when the break counts as work or there is none). */
+    public function unpaidBreakMinutes(): int
+    {
+        return $this->breakStart() && ! $this->break_paid ? (int) $this->break_minutes : 0;
+    }
+
+    /** Minutes of work in a full day: start to end, less an unpaid break. */
+    public function workMinutes(): int
+    {
+        return max(0, $this->lengthMinutes() - $this->unpaidBreakMinutes());
+    }
+
     /** Minutes to work per day on a flexible shift. */
     public function requiredMinutes(): int
     {
-        return $this->required_minutes ?: $this->lengthMinutes();
+        return $this->required_minutes ?: $this->workMinutes();
     }
 
     /** @return array<int, int> */
