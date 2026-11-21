@@ -71,10 +71,6 @@
                 <span x-cloak x-show="busy" class="spinner"></span>
                 <span x-text="busy ? '{{ __('Signing in…') }}' : '{{ __('Sign in') }}'">{{ __('Sign in') }}</span>
             </button>
-
-            <div class="text-end" x-show="method === 'password'">
-                <a href="{{ route('password.request') }}" class="auth-link">{{ __('Forgot password?') }}</a>
-            </div>
         </form>
 
         @if ($microsoft)

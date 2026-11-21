@@ -133,22 +133,58 @@ Alpine.data('countdown', (seconds) => ({
     },
 }));
 
-/* Sign-in pages: the soft light behind the card eases toward the pointer. */
+/* Sign-in pages: a field of faint grey dots that ripples like water.
+ | The colour comes from --color-slate-400, so it follows light and dark mode.
+ | With reduced motion the dots are drawn once and stay still. */
 const authBg = document.querySelector('[data-auth-bg]');
-if (authBg && window.matchMedia?.('(pointer: fine)').matches) {
-    let tx = 50, ty = 32, cx = 50, cy = 32, raf = null;
-    const step = () => {
-        cx += (tx - cx) * 0.09;
-        cy += (ty - cy) * 0.09;
-        authBg.style.setProperty('--mx', `${cx.toFixed(2)}%`);
-        authBg.style.setProperty('--my', `${cy.toFixed(2)}%`);
-        raf = Math.abs(tx - cx) > 0.1 || Math.abs(ty - cy) > 0.1 ? requestAnimationFrame(step) : null;
+if (authBg?.getContext) {
+    const ctx = authBg.getContext('2d');
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const gap = 24;
+    let w = 0, h = 0, colour = '#6f6c65', raf = null;
+
+    const readColour = () => {
+        colour = getComputedStyle(document.documentElement).getPropertyValue('--color-slate-400').trim() || colour;
     };
-    window.addEventListener('pointermove', (e) => {
-        tx = (e.clientX / window.innerWidth) * 100;
-        ty = (e.clientY / window.innerHeight) * 100;
-        raf ??= requestAnimationFrame(step);
-    }, { passive: true });
+    const resize = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        w = window.innerWidth;
+        h = window.innerHeight;
+        authBg.width = w * dpr;
+        authBg.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    const draw = (ms) => {
+        const t = ms / 1000;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = colour;
+        for (let y = gap / 2; y < h + gap; y += gap) {
+            for (let x = gap / 2; x < w + gap; x += gap) {
+                // two slow waves crossing each other
+                const wave = Math.sin(x * 0.012 + t * 0.9) + Math.sin((x + y) * 0.008 - t * 0.6);
+                const lift = wave / 2; // -1 … 1
+                ctx.globalAlpha = 0.16 + 0.12 * lift;
+                ctx.beginPath();
+                ctx.arc(x, y + lift * 4, 1.1 + 0.45 * lift, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.globalAlpha = 1;
+    };
+    const loop = (ms) => {
+        draw(ms);
+        raf = document.hidden ? null : requestAnimationFrame(loop);
+    };
+    const start = () => (still ? draw(0) : (raf ??= requestAnimationFrame(loop)));
+
+    readColour();
+    resize();
+    start();
+    window.addEventListener('resize', () => { resize(); if (still) draw(0); }, { passive: true });
+    document.addEventListener('visibilitychange', () => !document.hidden && start());
+    new MutationObserver(() => { readColour(); if (still) draw(0); })
+        .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => { readColour(); if (still) draw(0); });
 }
 
 /* Forms with data-confirm="Are you sure?" ask before submitting. */

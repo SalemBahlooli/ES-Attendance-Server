@@ -190,14 +190,19 @@
 }
 
 /* ---------------------------------------------------------------- sign-in
- | Pages before sign-in: the plain page colour and one small card, like the
- | original attendance app.
+ | Pages before sign-in: the plain page colour, a canvas of faint grey dots
+ | that ripple slowly (drawn in app.js), and one small card.
  */
 .auth-page {
     background: var(--page);
 }
 .auth-bg {
-    display: none;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
 }
 
 @layer components {

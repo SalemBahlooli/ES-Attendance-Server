@@ -1,6 +1,6 @@
 {{--
     Layout for pages before sign-in (login, reset password, two-factor):
-    a soft blue backdrop with a dot grid and a light that follows the cursor,
+    the page colour with a field of soft grey dots that ripple slowly,
     the logo, and one frosted card.
 
     <x-layouts.guest :title="__('Sign in')" :heading="__('Sign in')" :subheading="'One line'" icon="fa-shield-halved">
@@ -27,7 +27,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="auth-page min-h-screen overflow-x-hidden text-slate-900">
-<div class="auth-bg" data-auth-bg></div>
+<canvas class="auth-bg" data-auth-bg aria-hidden="true"></canvas>
 
 <div class="absolute end-3 top-3 z-10 sm:end-5 sm:top-5">
     <x-locale-switch />
@@ -65,7 +65,11 @@
     @endisset
 
     <div class="mt-7 text-center text-[13px] text-slate-500">
-        {{ setting('footer_text') ?: '© '.date('Y').' '.(setting('company_name') ?: $appName) }}
+        @if (setting('footer_text'))
+            {{ setting('footer_text') }}
+        @else
+            {{ __('Attendance System for Al-Ojaimi Energy Services') }} · {{ __('Made by') }} <strong class="font-semibold text-slate-900">Salem Buhluli</strong>
+        @endif
         @if (setting('support_email'))
             · <a href="mailto:{{ setting('support_email') }}" class="hover:text-slate-700 hover:underline">{{ setting('support_email') }}</a>
         @endif
