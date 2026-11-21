@@ -10,6 +10,7 @@ use App\Services\Attendance\BranchTransfer;
 use App\Services\Attendance\Clock;
 use App\Services\Attendance\PunchImporter;
 use App\Services\Attendance\ZkClient;
+use App\Services\Attendance\ZkUsers;
 use App\Support\Activity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,12 @@ class ImportController extends Controller
     /** What the file holds and how much of it is new. Nothing is saved. */
     public function preview(Request $request): JsonResponse
     {
-        [$text, $name] = $this->file($request);
+        [$text, $name, $users] = $this->files($request);
+
+        if ($text === null) {
+            return response()->json(['kind' => 'names', ...PunchImporter::namePlan($users),
+                'sample' => array_slice($users, 0, 8)]);
+        }
 
         if ($pkg = $this->branchPackage($text)) {
             try {
@@ -57,14 +63,24 @@ class ImportController extends Controller
             ...PunchImporter::summarise($parsed['rows']),
             'existing' => PunchImporter::countExisting($parsed['rows']),
             'names' => count($parsed['users']),
+            'device_names' => $users ? PunchImporter::namePlan($users, array_column($parsed['rows'], 'pin')) : null,
             'sample' => array_map(fn ($r) => ['pin' => $r['pin'], 'time' => $r['time']], array_slice($parsed['rows'], 0, 8)),
         ]);
     }
 
     public function store(Request $request): JsonResponse
     {
-        [$text, $name] = $this->file($request);
+        [$text, $name, $users] = $this->files($request);
         $userId = $request->user()->id;
+
+        // user.dat on its own: names for employees we already have
+        if ($text === null) {
+            $names = PunchImporter::saveUsers($users, create: false);
+            $import = PunchImporter::log('file', $this->usersFileName($request), null, ['total' => 0, 'inserted' => 0, 'duplicates' => 0], $names, $userId);
+            Activity::log('imported', $import, "Import employee names from {$import->label}: {$names} names added");
+
+            return response()->json(['kind' => 'names', 'names' => $names]);
+        }
 
         if ($pkg = $this->branchPackage($text)) {
             try {
@@ -72,8 +88,9 @@ class ImportController extends Controller
             } catch (RuntimeException $e) {
                 return response()->json(['message' => $e->getMessage()], 422);
             }
+            $names = PunchImporter::saveUsers($users, create: false);
             $period = $pkg['period']['from'].' – '.$pkg['period']['to'];
-            $import = PunchImporter::log('branch', $r['branch_name'].' · '.$period, $r['sn'], $r, $r['new_employees'], $userId);
+            $import = PunchImporter::log('branch', $r['branch_name'].' · '.$period, $r['sn'], $r, $r['new_employees'] + $names, $userId);
             Activity::log('imported', $import, "Import from another branch: {$r['branch_name']} ({$period}): {$r['inserted']} new punches, {$r['new_employees']} new employees, {$r['removed']} removed, {$r['leaves']} leaves");
 
             return response()->json(['kind' => 'branch', ...$r, 'period' => $pkg['period']]);
@@ -81,12 +98,15 @@ class ImportController extends Controller
 
         $parsed = $this->parse($text, $name, $request);
         $sn = trim((string) $request->input('sn')) ?: 'USB';
-        [$result, $names] = DB::transaction(fn () => [
-            PunchImporter::save($parsed['rows'], $sn, 'file'),
-            PunchImporter::saveUsers($parsed['users']),
-        ]);
-        $import = PunchImporter::log('file', $name, $sn, $result, $names, $userId);
-        Activity::log('imported', $import, "Import punches from file {$name}: {$result['inserted']} new of {$result['total']}");
+        [$result, $names] = DB::transaction(function () use ($parsed, $sn, $users) {
+            $result = PunchImporter::save($parsed['rows'], $sn, 'file');
+
+            // Names in the file itself first, then user.dat for the rest
+            return [$result, PunchImporter::saveUsers($parsed['users']) + PunchImporter::saveUsers($users, create: false)];
+        });
+        $label = $users ? $name.' + '.$this->usersFileName($request) : $name;
+        $import = PunchImporter::log('file', $label, $sn, $result, $names, $userId);
+        Activity::log('imported', $import, "Import punches from file {$label}: {$result['inserted']} new of {$result['total']}, {$names} names added");
 
         return response()->json(['kind' => 'punches', ...PunchImporter::summarise($parsed['rows']), ...$result, 'names' => $names, 'skipped' => $parsed['skipped']]);
     }
@@ -126,14 +146,53 @@ class ImportController extends Controller
         return response()->json(['sn' => $sn, ...$result, 'names' => $names, ...PunchImporter::summarise($data['rows'])]);
     }
 
-    /** @return array{0: string, 1: string} file text and name */
-    private function file(Request $request): array
+    /**
+     * The punches file (null when only user.dat was sent), its name, and the names read
+     * from user.dat. user.dat chosen as the main file counts as the names file.
+     *
+     * @return array{0: ?string, 1: string, 2: array<int, array{pin: string, name: string}>}
+     */
+    private function files(Request $request): array
     {
-        $request->validate(['file' => ['required', 'file', 'max:51200']], [], ['file' => __('File')]);
-        /** @var UploadedFile $file */
-        $file = $request->file('file');
+        $request->validate([
+            'file' => ['required_without:users_file', 'nullable', 'file', 'max:51200'],
+            'users_file' => ['nullable', 'file', 'max:'.intdiv(ZkUsers::MAX_BYTES, 1024)],
+        ], [], ['file' => __('File'), 'users_file' => __('Names file (user.dat)')]);
 
-        return [(string) file_get_contents($file->getRealPath()), mb_substr($file->getClientOriginalName(), 0, 200)];
+        /** @var UploadedFile|null $file */
+        $file = $request->file('file');
+        /** @var UploadedFile|null $usersFile */
+        $usersFile = $request->file('users_file');
+        if ($file && ! $usersFile && self::isUserDat($file)) {
+            [$file, $usersFile] = [null, $file];
+        }
+
+        $users = [];
+        if ($usersFile) {
+            $users = ZkUsers::fromFile((string) file_get_contents($usersFile->getRealPath()));
+            if (! array_filter($users, fn ($u) => $u['name'] !== '')) {
+                abort(response()->json(['message' => __('No employee names found in this file. Choose user.dat from the device USB export (Download User).')], 422));
+            }
+        }
+
+        return [
+            $file ? (string) file_get_contents($file->getRealPath()) : null,
+            $file ? mb_substr($file->getClientOriginalName(), 0, 200) : '',
+            $users,
+        ];
+    }
+
+    /** The device's user table ("user.dat", sometimes with the serial in front). */
+    public static function isUserDat(UploadedFile $file): bool
+    {
+        return (bool) preg_match('/(^|[_\-\s])user\.dat$/i', $file->getClientOriginalName());
+    }
+
+    private function usersFileName(Request $request): string
+    {
+        $file = $request->file('users_file') ?? $request->file('file');
+
+        return $file ? mb_substr($file->getClientOriginalName(), 0, 100) : 'user.dat';
     }
 
     private function branchPackage(string $text): ?array

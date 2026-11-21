@@ -61,6 +61,7 @@ Route::middleware('can:leaves.view')->group(function () {
 // Employees
 Route::middleware('can:employees.view')->group(function () {
     Route::get('employees', [Attendance\EmployeeController::class, 'index'])->name('employees.index');
+    Route::delete('employees', [Attendance\EmployeeController::class, 'destroyMany'])->middleware('can:employees.delete')->name('employees.destroy-many');
     Route::get('employees/{employee}', [Attendance\EmployeeController::class, 'show'])->name('employees.show');
     Route::get('employees/{employee}/export', [Attendance\EmployeeController::class, 'export'])->name('employees.export');
     Route::get('employees/{employee}/sheet', [Attendance\EmployeeSheetController::class, 'show'])->middleware('feature:employee_sheet')->name('employees.sheet');

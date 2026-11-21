@@ -305,26 +305,8 @@ class ZkClient
         $raw = substr($raw, 4);
         $recordSize = $this->users ? intdiv($size, $this->users) : 72;
         $recordSize = in_array($recordSize, [28, 72], true) ? $recordSize : 72;
-        $out = [];
-        foreach (str_split($raw, $recordSize) as $rec) {
-            if (strlen($rec) < $recordSize) {
-                break;
-            }
-            if ($recordSize === 28) {
-                $uid = unpack('v', substr($rec, 0, 2))[1];
-                $name = $this->cstr(substr($rec, 8, 8));
-                $pin = (string) unpack('V', substr($rec, 24, 4))[1];
-                $pin = $pin === '0' ? (string) $uid : $pin;
-            } else {
-                $name = $this->cstr(substr($rec, 11, 24));
-                $pin = $this->cstr(substr($rec, 48, 24));
-            }
-            if ($pin !== '') {
-                $out[] = ['pin' => $pin, 'name' => $name];
-            }
-        }
 
-        return $out;
+        return ZkUsers::decode($raw, $recordSize);
     }
 
     /** @return array<int, array{pin: string, time: string, status: ?int, verify: ?int}> */

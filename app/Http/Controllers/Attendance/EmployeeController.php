@@ -12,9 +12,11 @@ use App\Models\User;
 use App\Services\Attendance\Calculator;
 use App\Services\Attendance\Clock;
 use App\Services\Attendance\LeaveBalance;
+use App\Support\Activity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -110,6 +112,41 @@ class EmployeeController extends Controller
         $employee->update($data);
 
         return back()->with('success', __('Changes saved.'));
+    }
+
+    /**
+     * Delete the chosen employees. Their leaves, requests and shift schedules go with them;
+     * their punches are kept as deleted (like a punch deleted by hand), so the same punches
+     * from a re-import or the device are not saved again and the employee does not come back.
+     */
+    public function destroyMany(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer', 'distinct'],
+        ], [], ['ids' => __('Employees')]);
+
+        $employees = Employee::whereIn('id', $data['ids'])->get();
+        if ($employees->isEmpty()) {
+            return back()->with('error', __('Choose the employees to delete.'));
+        }
+
+        $userId = $request->user()->id;
+        $punches = DB::transaction(function () use ($employees, $userId) {
+            $punches = 0;
+            foreach ($employees->pluck('pin')->chunk(500) as $pins) {
+                $punches += Punch::whereIn('pin', $pins->all())->update(['deleted_at' => now(), 'deleted_by' => $userId]);
+            }
+            $employees->each->delete(); // each one is in the activity log
+
+            return $punches;
+        });
+
+        $names = $employees->map->label()->take(20)->implode(', ').($employees->count() > 20 ? ', …' : '');
+        Activity::log('employees_deleted', null, "Deleted {$employees->count()} employees ({$punches} punches marked deleted): {$names}");
+
+        return redirect()->route('employees.index', $request->only(['q', 'department_id', 'inactive', 'page']))
+            ->with('success', trans_choice(':count employee deleted.|:count employees deleted.', $employees->count()));
     }
 
     /**

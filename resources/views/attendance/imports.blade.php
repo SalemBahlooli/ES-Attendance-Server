@@ -10,16 +10,33 @@
                     <li>{!! __('Plug the USB stick into this computer and choose the file, usually :a or :b.', ['a' => '<code dir="ltr">1_attlog.dat</code>', 'b' => '<code dir="ltr">&lt;serial&gt;_attlog.dat</code>']) !!}</li>
                     <li>{{ __('CSV or TXT files also work, for example an export from ZKTeco software saved as CSV. They need an employee ID column and a date/time column.') }}</li>
                     <li>{!! __('A file sent by another branch (:name) is imported here too.', ['name' => '<code dir="ltr">Attendance_….json</code>']) !!}</li>
+                    <li>{!! __('Employee names: on the device choose :path, then add :file with the punches file or on its own. Names are matched by employee ID and only fill in employees who have no name yet.', ['path' => '<b>Download User</b>', 'file' => '<code dir="ltr">user.dat</code>']) !!}</li>
                 </ol>
 
                 <label class="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 px-4 py-8 text-center transition hover:border-brand-400 hover:bg-brand-50/40"
                        :class="dragging && 'border-brand-500 bg-brand-50'"
-                       @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="dragging = false; pick($event.dataTransfer.files[0])">
-                    <input type="file" class="sr-only" accept=".dat,.txt,.csv,.tsv,.log,.json,text/plain,text/csv,application/json" @change="pick($event.target.files[0])">
+                       @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="dragging = false; pick($event.dataTransfer.files)">
+                    <input type="file" class="sr-only" multiple accept=".dat,.txt,.csv,.tsv,.log,.json,text/plain,text/csv,application/json" @change="pick($event.target.files)">
                     <i class="fa-solid fa-file-arrow-up text-2xl text-slate-400"></i>
                     <strong class="text-sm text-slate-800" x-text="file ? file.name : @js(__('Drop the file here'))"></strong>
                     <span class="text-xs text-slate-500">{{ __('or click to choose it') }}</span>
                 </label>
+
+                {{-- Optional: the device's names (user.dat) --}}
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                    <i class="fa-solid fa-id-card text-slate-400"></i>
+                    <span class="text-slate-600">{{ __('Names file (user.dat)') }}:</span>
+                    <template x-if="usersFile">
+                        <span class="inline-flex items-center gap-1">
+                            <code dir="ltr" x-text="usersFile.name"></code>
+                            <button type="button" class="btn-icon size-7" @click="dropUsers()" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}"><i class="fa-solid fa-xmark text-xs"></i></button>
+                        </span>
+                    </template>
+                    <label class="btn btn-sm btn-secondary cursor-pointer" x-show="!usersFile">
+                        <input type="file" class="sr-only" x-ref="usersInput" accept=".dat,application/octet-stream" @change="pickUsers($event.target.files[0])">
+                        <i class="fa-solid fa-plus"></i>{{ __('Add (optional)') }}
+                    </label>
+                </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
@@ -53,7 +70,24 @@
                         </div>
                         <p class="text-xs text-slate-500" dir="ltr" x-text="info.first + ' → ' + info.last"></p>
                         <p class="text-xs text-amber-700" x-show="info.skipped" x-text="@js(__('Lines that could not be read: :n')).replace(':n', info.skipped)"></p>
+                        <p class="text-xs text-slate-600" x-show="info.device_names" x-text="info.device_names && @js(__('user.dat: :names names, :matched match these employees, :fill will be added.')).replace(':names', info.device_names.names).replace(':matched', info.device_names.matched).replace(':fill', info.device_names.fill)"></p>
                         <div class="flex justify-end"><button type="button" class="btn btn-primary" @click="save()" :disabled="busy"><i class="fa-solid fa-file-import"></i>{{ __('Import') }}</button></div>
+                    </div>
+                </template>
+
+                {{-- Preview: names only (user.dat) --}}
+                <template x-if="info && info.kind === 'names' && !done">
+                    <div class="space-y-3 rounded-xl border border-slate-200 p-4 text-sm">
+                        <div class="flex flex-wrap gap-x-6 gap-y-1">
+                            <span>{{ __('Names in the file') }}: <b x-text="info.names"></b></span>
+                            <span>{{ __('Match our employees') }}: <b x-text="info.matched"></b></span>
+                            <span>{{ __('Will be added') }}: <b class="text-green-700" x-text="info.fill"></b></span>
+                        </div>
+                        <ul class="grid gap-x-4 text-xs text-slate-500 sm:grid-cols-2">
+                            <template x-for="u in info.sample" :key="u.pin"><li><span class="tabular-nums" dir="ltr" x-text="u.pin"></span> · <span x-text="u.name || '—'"></span></li></template>
+                        </ul>
+                        <p class="text-xs text-slate-500">{{ __('Employees who never punched here are not added. A name already set in this program is kept.') }}</p>
+                        <div class="flex justify-end"><button type="button" class="btn btn-primary" @click="save()" :disabled="busy || !info.fill"><i class="fa-solid fa-file-import"></i>{{ __('Import names') }}</button></div>
                     </div>
                 </template>
 
@@ -76,6 +110,7 @@
                 <template x-if="done">
                     <x-alert type="success">
                         <span x-show="done.kind === 'punches'" x-text="@js(__(':new new punches saved, :dup already saved, :names names added.')).replace(':new', done.inserted).replace(':dup', done.duplicates).replace(':names', done.names)"></span>
+                        <span x-show="done.kind === 'names'" x-text="@js(__(':names names added.')).replace(':names', done.names)"></span>
                         <span x-show="done.kind === 'branch'" x-text="@js(__(':new new punches, :emp new employees, :removed taken out, :leaves leaves.')).replace(':new', done.inserted).replace(':emp', done.new_employees).replace(':removed', done.removed).replace(':leaves', done.leaves)"></span>
                     </x-alert>
                 </template>

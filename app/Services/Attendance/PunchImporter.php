@@ -310,13 +310,22 @@ class PunchImporter
                 'source' => $source, 'created_by' => $source === 'manual' ? $userId : null, 'received_at' => $now,
             ], $chunk));
         }
-        Employee::ensure(array_column($unique, 'pin'));
+        // Only numbers with a punch that is not deleted: re-importing an old file must not
+        // bring back an employee who was deleted together with their punches.
+        $pins = array_values(array_unique(array_map('strval', array_column($unique, 'pin'))));
+        foreach (array_chunk($pins, 500) as $chunk) {
+            Employee::ensure(Punch::whereIn('pin', $chunk)->distinct()->pluck('pin')->all());
+        }
 
         return ['total' => count($rows), 'unique' => count($unique), 'inserted' => $inserted, 'duplicates' => count($unique) - $inserted];
     }
 
-    /** Fill in names we don't have yet (a name typed in the app is never overwritten). */
-    public static function saveUsers(?array $users): int
+    /**
+     * Fill in names we don't have yet (a name typed in the app is never overwritten).
+     * With $create off, only employees that already exist get a name: user.dat lists
+     * everyone enrolled on the device, including people who never punch here.
+     */
+    public static function saveUsers(?array $users, bool $create = true): int
     {
         $count = 0;
         foreach ($users ?? [] as $u) {
@@ -325,12 +334,50 @@ class PunchImporter
             if ($pin === '' || $name === '') {
                 continue;
             }
-            Employee::ensure([$pin]);
+            if ($create) {
+                Employee::ensure([$pin]);
+            }
             $count += Employee::where('pin', $pin)->where(fn ($q) => $q->whereNull('name')->orWhere('name', ''))
                 ->update(['name' => mb_substr($name, 0, 255), 'updated_at' => now()]);
         }
 
         return $count;
+    }
+
+    /**
+     * What a list of device names would do, without saving: how many belong to an employee
+     * we have (or one this import adds) and how many of those still have no name.
+     *
+     * @param  array<int, array{pin: string, name: string}>  $users
+     * @param  array<int, string>  $newPins  employee numbers the same import brings in
+     * @return array{names: int, matched: int, fill: int}
+     */
+    public static function namePlan(array $users, array $newPins = []): array
+    {
+        $byPin = [];
+        foreach ($users as $u) {
+            if (trim((string) $u['name']) !== '') {
+                $byPin[(string) $u['pin']] = true;
+            }
+        }
+        $existing = [];
+        foreach (array_chunk(array_map('strval', array_keys($byPin)), 500) as $chunk) {
+            $existing += Employee::whereIn('pin', $chunk)->pluck('name', 'pin')->all();
+        }
+        $newPins = array_flip(array_map('strval', $newPins));
+        $matched = $fill = 0;
+        foreach (array_keys($byPin) as $pin) {
+            $pin = (string) $pin;
+            if (array_key_exists($pin, $existing)) {
+                $matched++;
+                $fill += trim((string) $existing[$pin]) === '' ? 1 : 0;
+            } elseif (isset($newPins[$pin])) {
+                $matched++;
+                $fill++;
+            }
+        }
+
+        return ['names' => count($byPin), 'matched' => $matched, 'fill' => $fill];
     }
 
     /** Rows sent as JSON (LAN bridge). */

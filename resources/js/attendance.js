@@ -1,7 +1,7 @@
 /*
  | The attendance pages' Alpine components:
  |   punchEditor        the "Edit punches" dialog (daily, employee, punch log)
- |   punchFileImport    USB / CSV / branch file: preview, then import
+ |   punchFileImport    USB / CSV / branch file (+ user.dat names): preview, then import
  |   lanPull            test and pull a device over the LAN
  |   attendanceOverview the Overview page: calendar, charts, attendance map, tables
  */
@@ -112,24 +112,43 @@ export function registerAttendance(Alpine) {
 
     /* --------------------------------------------------- file import */
     Alpine.data('punchFileImport', (urls) => ({
-        file: null, sn: 'USB', dateOrder: 'dmy', withLeaves: true,
+        file: null, usersFile: null, sn: 'USB', dateOrder: 'dmy', withLeaves: true,
         busy: false, error: '', info: null, done: null, dragging: false,
 
-        pick(file) {
-            if (!file) return;
-            this.file = file;
+        // user.dat (the device's names) can come with the punches file, in one drop or apart
+        isUserDat: (f) => /(^|[_\-\s])user\.dat$/i.test(f.name),
+        pick(files) {
+            const list = [...(files || [])];
+            if (!list.length) return;
+            for (const f of list) {
+                if (this.isUserDat(f)) this.usersFile = f;
+                else this.file = f;
+            }
             this.done = null;
             this.preview();
         },
+        pickUsers(f) {
+            if (!f) return;
+            this.usersFile = f;
+            this.done = null;
+            this.preview();
+        },
+        dropUsers() {
+            this.usersFile = null;
+            this.$refs.usersInput.value = '';
+            this.file ? this.preview() : (this.info = null);
+        },
         form() {
             const f = new FormData();
-            f.append('file', this.file);
+            if (this.file) f.append('file', this.file);
+            if (this.usersFile) f.append('users_file', this.usersFile);
             f.append('sn', this.sn);
             f.append('date_order', this.dateOrder);
             f.append('leaves', this.withLeaves ? '1' : '0');
             return f;
         },
         async preview() {
+            if (!this.file && !this.usersFile) return;
             Object.assign(this, { busy: true, error: '', info: null });
             try {
                 this.info = await send(urls.previewUrl, { method: 'POST', form: this.form() });

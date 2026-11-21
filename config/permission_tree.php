@@ -299,7 +299,16 @@ return [
                     'employees.view' => [
                         'label' => 'View employees',
                         'children' => [
-                            'employees.edit' => ['label' => 'Edit employee details'],
+                            'employees.edit' => [
+                                'label' => 'Edit employee details',
+                                'children' => [
+                                    'employees.delete' => [
+                                        'label' => 'Delete employees',
+                                        'note' => 'Removes the employee with their leaves and requests. Their punches are kept as deleted, so a re-import does not bring them back.',
+                                        'sensitive' => true,
+                                    ],
+                                ],
+                            ],
                         ],
                     ],
                 ],
