@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin;
 use App\Http\Controllers\Auth;
 use App\Http\Controllers\ChangelogController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocsController;
 use App\Http\Controllers\HeartbeatController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\NotificationController;
@@ -83,6 +84,9 @@ Route::middleware('auth')->group(function () {
             Route::delete('tokens/{token}', [Account\TokenController::class, 'destroy'])->name('tokens.destroy');
         });
     });
+
+    // Documentation: how everything works (every signed-in account)
+    Route::get('docs', DocsController::class)->name('docs.index');
 
     // What's new
     Route::get('changelog', [ChangelogController::class, 'index'])->name('changelog.index');

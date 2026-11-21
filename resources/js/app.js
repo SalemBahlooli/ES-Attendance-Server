@@ -7,6 +7,7 @@ import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
 import { Chart, registerables } from 'chart.js';
 import { registerAttendance } from './attendance';
+import { registerDocs } from './docs';
 
 Chart.register(...registerables);
 window.Chart = Chart;
@@ -194,6 +195,7 @@ document.addEventListener('submit', (e) => {
 });
 
 registerAttendance(Alpine);
+registerDocs(Alpine);
 
 window.App = { postJson, startHeartbeat };
 Alpine.start();

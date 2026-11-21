@@ -73,5 +73,6 @@ return [
 
     ['heading' => 'Help'],
 
+    ['label' => 'Documentation', 'icon' => 'fa-book-open', 'route' => 'docs.index', 'active' => 'docs.*'],
     ['label' => "What's new", 'icon' => 'fa-wand-magic-sparkles', 'route' => 'changelog.index', 'active' => 'changelog.*'],
 ];
