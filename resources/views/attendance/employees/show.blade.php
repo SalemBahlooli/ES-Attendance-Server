@@ -6,7 +6,7 @@
         __('Last month') => [gmdate('Y-m-01', strtotime($month.'-01 12:00 UTC -1 month')), gmdate('Y-m-t', strtotime($month.'-01 12:00 UTC -1 month'))],
         __('Last 30 days') => [gmdate('Y-m-d', strtotime($today.' 12:00 UTC -29 days')), $today],
         __('Last 3 months') => [gmdate('Y-m-d', strtotime($today.' 12:00 UTC -89 days')), $today],
-        __('Timesheet period') => [\App\Services\Attendance\Exports\TimesheetWorkbook::period(substr($today, 8) > '15' ? gmdate('Y-m', strtotime($month.'-01 12:00 UTC +1 month')) : $month)['from'], $today],
+        __('Timesheet period') => [\App\Services\Attendance\Exports\TimesheetWorkbook::period(\App\Services\Attendance\Exports\TimesheetWorkbook::monthOf($today))['from'], $today],
     ];
     $span = (strtotime($to) - strtotime($from)) / 86400 + 1;
     $prev = [gmdate('Y-m-d', strtotime($from.' 12:00 UTC') - $span * 86400), gmdate('Y-m-d', strtotime($from.' 12:00 UTC') - 86400)];
@@ -22,6 +22,9 @@
         @can('reports.view')
             <a href="{{ route('overview.index', ['from' => $from, 'to' => $to, 'pin' => $employee->pin]) }}" class="btn btn-secondary"><i class="fa-solid fa-chart-pie"></i>{{ __('Open in Overview') }}</a>
         @endcan
+        @if (feature('employee_sheet'))
+            <a href="{{ route('employees.sheet', ['employee' => $employee, 'from' => $from, 'to' => $to]) }}" class="btn btn-secondary" target="_blank"><i class="fa-solid fa-print"></i>{{ __('Print sheet') }}</a>
+        @endif
         <a href="{{ route('employees.export', ['employee' => $employee, 'from' => $from, 'to' => $to]) }}" class="btn btn-primary"><i class="fa-solid fa-file-csv"></i>{{ __('Export to Excel (CSV)') }}</a>
     </x-slot:actions>
 
@@ -53,7 +56,25 @@
             <x-stat :label="__('Times late')" :value="$stats['late_count']" icon="fa-user-clock" color="amber" :hint="Calculator::duration($stats['late_minutes'])" />
             <x-stat :label="__('Early leave')" :value="Calculator::duration($stats['early_minutes']) ?: '0'" icon="fa-person-walking-arrow-right" color="purple" />
             <x-stat :label="__('Worked hours')" :value="Calculator::duration($stats['worked_minutes']) ?: '0'" icon="fa-business-time" color="teal" />
+            @if (feature('overtime'))
+                <x-stat :label="__('Overtime')" :value="Calculator::duration($stats['overtime_minutes']) ?: '0'" icon="fa-clock" color="teal" />
+            @endif
+            @if ($balance)
+                <x-stat :label="__('Annual leave left')" :value="$balance['remaining']" icon="fa-umbrella-beach" color="blue"
+                        :hint="__(':used of :total days used in :year', ['used' => $balance['used'], 'total' => $balance['entitlement'], 'year' => $balance['year']])" />
+            @endif
         </div>
+
+        @if ($assignments->isNotEmpty())
+            <div class="card mb-4 p-3">
+                <div class="mb-2 flex items-center gap-2 text-sm font-medium text-slate-900"><i class="fa-solid fa-calendar-week text-slate-400"></i>{{ __('Shift schedule') }}</div>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach ($assignments as $a)
+                        <span class="chip cursor-default">{{ $a->shift?->name }} · <span class="tabular-nums" dir="ltr">{{ format_day($a->start_date->toDateString()) }} – {{ format_day($a->end_date->toDateString()) }}</span></span>
+                    @endforeach
+                </div>
+            </div>
+        @endif
     @else
         <x-alert type="info" class="mb-4">{{ __('This employee is inactive: the attendance rules are not applied, punches are shown as they are.') }}</x-alert>
     @endif
@@ -65,6 +86,7 @@
                     <tr>
                         <th>{{ __('Date') }}</th><th>{{ __('Day') }}</th><th>{{ __('Status') }}</th><th>{{ __('In') }}</th><th>{{ __('Out') }}</th>
                         <th>{{ __('Worked') }}</th><th>{{ __('Late') }}</th><th class="hidden sm:table-cell">{{ __('Early leave') }}</th>
+                        @if (feature('overtime'))<th class="hidden sm:table-cell">{{ __('Overtime') }}</th>@endif
                         <th>{{ __('All punches') }}</th><th class="hidden md:table-cell">{{ __('Note') }}</th>
                         @can('punches.edit')<th class="w-10"></th>@endcan
                     </tr>
@@ -80,6 +102,7 @@
                             <td class="tabular-nums">{{ Calculator::duration($d['worked_minutes']) }}</td>
                             <td class="tabular-nums">{{ $d['late_minutes'] ? __(':n min', ['n' => $d['late_minutes']]) : '' }}</td>
                             <td class="hidden tabular-nums sm:table-cell">{{ $d['early_minutes'] ? __(':n min', ['n' => $d['early_minutes']]) : '' }}</td>
+                            @if (feature('overtime'))<td class="hidden tabular-nums text-teal-700 sm:table-cell">{{ Calculator::duration($d['overtime_minutes'] ?? 0) }}</td>@endif
                             <td>
                                 <div class="flex flex-wrap gap-1" dir="ltr">
                                     @foreach ($d['times'] as $t)
@@ -88,7 +111,11 @@
                                     @endforeach
                                 </div>
                             </td>
-                            <td class="hidden text-slate-500 md:table-cell">{{ $d['note'] }}</td>
+                            <td class="hidden text-slate-500 md:table-cell">
+                                {{ $d['note'] }}
+                                @if ($d['special'] ?? null)<div class="text-xs text-brand-700">{{ $d['special'] }} <span dir="ltr">({{ $d['shift_start'] }}–{{ $d['shift_end'] }})</span></div>
+                                @elseif (feature('rosters') && ($d['shift'] ?? null) && $d['shift'] !== $shift?->name)<div class="text-xs text-brand-700">{{ $d['shift'] }}</div>@endif
+                            </td>
                             @can('punches.edit')
                                 <td class="text-end">
                                     <button type="button" class="btn-icon size-8" title="{{ $d['punches'] ? __('Edit punches') : __('Add punch') }}" aria-label="{{ __('Edit punches') }}"
@@ -97,7 +124,7 @@
                             @endcan
                         </tr>
                     @empty
-                        <tr><td colspan="11"><x-empty icon="fa-fingerprint" :title="__('No punches in this period')" /></td></tr>
+                        <tr><td colspan="12"><x-empty icon="fa-fingerprint" :title="__('No punches in this period')" /></td></tr>
                     @endforelse
                 </tbody>
             </table>

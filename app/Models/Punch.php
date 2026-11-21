@@ -49,6 +49,23 @@ class Punch extends Model
         return substr((string) $this->getRawOriginal('punch_time', $this->punch_time), 0, 19);
     }
 
+    /**
+     * A punch added by hand. Brings back a deleted row at the same time instead of
+     * duplicating it (one punch per employee per second).
+     */
+    public static function addManual(string $pin, string $time, ?string $note, ?int $userId, ?int $replacesId = null): self
+    {
+        $punch = static::withTrashed()->where('pin', $pin)->where('punch_time', $time)->first() ?? new static(['pin' => $pin, 'punch_time' => $time]);
+        $punch->fill([
+            'sn' => 'MANUAL', 'source' => 'manual', 'created_by' => $userId,
+            'note' => $note, 'replaces_id' => $replacesId, 'deleted_by' => null,
+        ]);
+        $punch->deleted_at = null;
+        $punch->save();
+
+        return $punch;
+    }
+
     public function activityLabel(): string
     {
         return Employee::labelFor($this->pin).' · '.substr($this->time(), 0, 16);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Announcement;
+use App\Models\EmployeeRequest;
 use App\Models\SignIn;
 use App\Models\User;
 use App\Services\Attendance\Calculator;
@@ -51,6 +52,14 @@ class DashboardController extends Controller
                 'leave' => $rows->where('status', 'leave')->count(),
                 'not_yet' => $rows->where('status', 'not_yet')->count(),
             ];
+        }
+
+        // The employee portal: this person's own day
+        if (feature('portal') && ($employee = $user->employee) && $employee->is_active) {
+            $data['myToday'] = collect(app(Calculator::class)->compute($today = Clock::today(), $today, null, [$employee->pin])['days'])->first();
+        }
+        if ($user->hasAccess('requests.review') && EmployeeRequest::enabledKinds()) {
+            $data['pendingRequests'] = EmployeeRequest::enabled()->where('status', 'pending')->count();
         }
 
         return view('dashboard', $data);

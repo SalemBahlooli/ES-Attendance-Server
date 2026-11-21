@@ -42,7 +42,7 @@ class ReportController extends Controller
             'pin' => $pin,
             'detail' => $detail,
             'detailEmployee' => $pin !== '' ? collect($result['summary'])->firstWhere('pin', $pin) : null,
-            'timesheetMonth' => $month ?? substr(Clock::today(), 0, 7),
+            'timesheetMonth' => $month ?? TimesheetWorkbook::monthOf(Clock::today()),
             'branchName' => BranchTransfer::branchName(),
         ]);
     }

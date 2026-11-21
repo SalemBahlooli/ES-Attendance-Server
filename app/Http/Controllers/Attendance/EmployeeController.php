@@ -8,8 +8,10 @@ use App\Http\Requests\Attendance\EmployeeRequest;
 use App\Models\Employee;
 use App\Models\Punch;
 use App\Models\Shift;
+use App\Models\User;
 use App\Services\Attendance\Calculator;
 use App\Services\Attendance\Clock;
+use App\Services\Attendance\LeaveBalance;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -52,29 +54,18 @@ class EmployeeController extends Controller
             $days = $days->reject(fn ($d) => in_array($d['status'], ['weekend', 'holiday'], true))->values();
         }
 
-        $counted = $days->reject(fn ($d) => in_array($d['status'], ['not_yet', null], true));
-        $workDays = $counted->whereNotIn('status', ['weekend', 'holiday', 'offday_work'])->count();
-        $present = $counted->whereIn('status', ['present', 'late'])->count();
-
         return view('attendance.employees.show', [
             'employee' => $employee,
             'shift' => $employee->effectiveShift(),
             'from' => $from, 'to' => $to,
             'days' => $days,
             'hideOff' => $request->boolean('hide_off'),
-            'stats' => [
-                'work_days' => $workDays,
-                'present' => $present,
-                'absent' => $counted->where('status', 'absent')->count(),
-                'leave' => $counted->where('status', 'leave')->count(),
-                'late_count' => $counted->where('late_minutes', '>', 0)->count(),
-                'late_minutes' => $counted->sum('late_minutes'),
-                'early_minutes' => $counted->sum('early_minutes'),
-                'worked_minutes' => $days->sum('worked_minutes'),
-                'missing_out' => $counted->where('missing_out', true)->count(),
-            ],
+            'stats' => Calculator::totals($days),
+            'balance' => feature('leave_balances') ? LeaveBalance::for($employee) : null,
+            'assignments' => feature('rosters') ? $employee->assignments()->with('shift:id,name')->where('end_date', '>=', Clock::today())->orderBy('start_date')->limit(10)->get() : collect(),
             'departments' => $this->departmentOptions(),
             'shifts' => Shift::orderByDesc('is_default')->orderBy('name')->pluck('name', 'id')->all(),
+            'users' => feature('portal') ? $this->userOptions($employee) : [],
         ]);
     }
 
@@ -88,14 +79,19 @@ class EmployeeController extends Controller
         return response()->streamDownload(function () use ($days) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, [__('Date'), __('Day'), __('Status'), __('In'), __('Out'), __('Worked'), __('Late (min)'), __('Early leave (min)'), __('All punches'), __('Note')]);
+            $overtime = feature('overtime');
+            fputcsv($out, array_values(array_filter([__('Date'), __('Day'), __('Status'), __('In'), __('Out'), __('Worked'), __('Late (min)'), __('Early leave (min)'),
+                $overtime ? __('Overtime') : null, __('All punches'), __('Note')], fn ($v) => $v !== null)));
             foreach ($days as $d) {
-                fputcsv($out, [
+                $row = [
                     $d['date'], __($d['day_name']), Calculator::statusLabel($d['status']),
                     $d['first_in'] ? substr($d['first_in'], 11, 5) : '', $d['last_out'] ? substr($d['last_out'], 11, 5) : '',
                     Calculator::duration($d['worked_minutes']), $d['late_minutes'] ?: '', $d['early_minutes'] ?: '',
-                    implode(' ', $d['times']), $d['note'] ?? '',
-                ]);
+                ];
+                if ($overtime) {
+                    $row[] = Calculator::duration($d['overtime_minutes'] ?? 0);
+                }
+                fputcsv($out, [...$row, implode(' ', $d['times']), $d['note'] ?? '']);
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=utf-8']);
@@ -103,15 +99,41 @@ class EmployeeController extends Controller
 
     public function update(EmployeeRequest $request, Employee $employee): RedirectResponse
     {
-        $employee->update($request->validated());
+        $data = $request->validated();
+        // Fields of features that are off are not on the form: keep what is saved
+        if (! feature('portal')) {
+            unset($data['user_id']);
+        }
+        if (! feature('leave_balances')) {
+            unset($data['annual_leave_days']);
+        }
+        $employee->update($data);
 
         return back()->with('success', __('Changes saved.'));
+    }
+
+    /**
+     * Accounts that can be linked to this employee: not linked to anyone else.
+     *
+     * @return array<int, string>
+     */
+    private function userOptions(Employee $employee): array
+    {
+        $taken = Employee::whereNotNull('user_id')->whereKeyNot($employee->id)->pluck('user_id');
+
+        return User::query()->whereNotIn('id', $taken)->orderBy('name')->get(['id', 'name', 'email'])
+            ->mapWithKeys(fn ($u) => [$u->id => $u->name.' · '.$u->email])->all();
     }
 
     /**
      * Day rows for one employee. Inactive employees are left out of the attendance
      * rules, so their punches are only grouped by date.
      */
+    public static function daysFor(Employee $employee, string $from, string $to, Calculator $calculator): Collection
+    {
+        return (new self)->days($employee, $from, $to, $calculator);
+    }
+
     private function days(Employee $employee, string $from, string $to, Calculator $calculator): Collection
     {
         if ($employee->is_active) {
@@ -133,7 +155,8 @@ class EmployeeController extends Controller
                     'times' => $times->map(fn ($t) => substr($t, 11, 5))->all(),
                     'manual_times' => $list->where('source', 'manual')->map(fn ($p) => substr((string) $p->punch_time, 11, 5))->values()->all(),
                     'worked_minutes' => $last ? intdiv(Clock::seconds($last) - Clock::seconds($first), 60) : 0,
-                    'late_minutes' => 0, 'early_minutes' => 0, 'missing_out' => false, 'note' => null, 'leave_type' => null,
+                    'late_minutes' => 0, 'early_minutes' => 0, 'overtime_minutes' => 0, 'missing_out' => false, 'note' => null, 'leave_type' => null,
+                    'shift' => null, 'special' => null,
                 ];
             })->values();
     }

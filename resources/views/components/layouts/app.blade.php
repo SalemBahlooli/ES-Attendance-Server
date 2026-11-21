@@ -40,7 +40,6 @@
     @endif
     {{-- Light / dark chosen in the account menu; set before the page draws --}}
     <script>try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
-    @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

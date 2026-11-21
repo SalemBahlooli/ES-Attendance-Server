@@ -17,13 +17,14 @@ class Employee extends Model
 {
     use HasFactory, LogsActivity;
 
-    protected $fillable = ['pin', 'name', 'department_id', 'shift_id', 'is_active', 'start_date'];
+    protected $fillable = ['pin', 'name', 'department_id', 'shift_id', 'is_active', 'start_date', 'user_id', 'annual_leave_days'];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
             'start_date' => 'date:Y-m-d',
+            'annual_leave_days' => 'integer',
         ];
     }
 
@@ -35,6 +36,22 @@ class Employee extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class);
+    }
+
+    /** The sign-in account (the employee portal). */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ShiftAssignment::class);
+    }
+
+    public function requests(): HasMany
+    {
+        return $this->hasMany(EmployeeRequest::class);
     }
 
     public function leaves(): HasMany

@@ -60,6 +60,11 @@ CI runs the same four checks.
 - One punch per employee per second: the unique key is `(pin, punch_time)`. Deleting a punch is a soft delete so the
   device cannot send it back. `Punch` has no `LogsActivity` (thousands of rows); manual changes call `Activity::log()`.
 - All attendance rules live in `App\Services\Attendance\Calculator::compute()`. Pages, exports and the dashboard all use it.
+- Optional features (Settings → Optional features) are read with `feature('portal')`, `feature('overtime')`...
+  Routes use the `feature:<name>` middleware (404 while off); menu items take `'feature' => ...` and `'employee' => true`
+  (only accounts linked to an employee). Leave and punch requests need the portal as well.
+- The employee portal (`/my/*`) has no permission: an account sees only the employee whose `user_id` is that account.
+- `php artisan attendance:import-legacy` copies the old Node.js database; it must stay safe to run again (match, never duplicate).
 - `tools/lan-bridge` is a separate Node.js program for office PCs; it posts to `/api/v1/punches/import` with an API token.
 
 ## Do not remove

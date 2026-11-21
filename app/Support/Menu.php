@@ -116,6 +116,14 @@ class Menu
             if (! empty($item['can']) && ! $user?->hasAccess($item['can'])) {
                 continue;
             }
+            // 'feature' => 'portal' (or a list: any of them) — an optional feature from Settings
+            if (! empty($item['feature']) && ! collect((array) $item['feature'])->contains(fn ($f) => feature($f))) {
+                continue;
+            }
+            // 'employee' => true — only for accounts linked to an employee (the portal)
+            if (! empty($item['employee']) && ! $user?->employee) {
+                continue;
+            }
 
             if (! empty($item['children'])) {
                 $item['children'] = self::filter($item['children'], $user);

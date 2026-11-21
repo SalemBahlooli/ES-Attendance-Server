@@ -1,5 +1,8 @@
 <x-layouts.app :title="__('Shifts & departments')" :breadcrumbs="[__('Shifts & departments') => null]">
     <x-slot:actions>
+        @if (feature('rosters'))
+            <a href="{{ route('schedules.index') }}" class="btn btn-secondary"><i class="fa-solid fa-calendar-week"></i>{{ __('Shift schedules') }}</a>
+        @endif
         <button type="button" class="btn btn-primary" @click="$dispatch('open-modal', 'shift-new')"><i class="fa-solid fa-plus"></i>{{ __('Add shift') }}</button>
     </x-slot:actions>
 
@@ -15,6 +18,7 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="font-semibold text-slate-900">{{ $shift->name }}</h3>
                             @if ($shift->is_default)<x-badge color="brand">{{ __('Default') }}</x-badge>@endif
+                            @if ($shift->isFlexible())<x-badge color="teal">{{ __('Flexible: :h a day', ['h' => \App\Services\Attendance\Calculator::duration($shift->requiredMinutes())]) }}</x-badge>@endif
                         </div>
                         <p class="mt-1 text-sm text-slate-600"><span dir="ltr">{{ $shift->start() }} – {{ $shift->end() }}</span> · {{ __('Late grace :n min', ['n' => $shift->grace_in]) }} · {{ __('Early leave grace :n min', ['n' => $shift->grace_out]) }}</p>
                         <p class="mt-0.5 text-xs text-slate-500">{{ __('Weekend') }}: {{ $shift->weekendLabel() }} · {{ __(':e employees, :d departments', ['e' => $shift->employees_count, 'd' => $shift->departments_count]) }}</p>
@@ -77,4 +81,40 @@
             </form>
         </x-slot:footer>
     </x-card>
+
+    @if (feature('special_hours'))
+        <x-card :title="__('Special working hours')" :subtitle="__('Other start and end times between two dates, e.g. Ramadan. Grace and days off still come from the shift.')" icon="fa-moon" :padding="false" class="mt-4">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead><tr><th>{{ __('Name') }}</th><th>{{ __('From') }}</th><th>{{ __('To') }}</th><th>{{ __('Hours') }}</th><th>{{ __('Shift') }}</th><th class="w-12"></th></tr></thead>
+                    <tbody>
+                        @forelse ($specials as $p)
+                            <tr>
+                                <td class="font-medium text-slate-900">{{ $p->name }}</td>
+                                <td class="tabular-nums">{{ format_day($p->start_date->toDateString()) }}</td>
+                                <td class="tabular-nums">{{ format_day($p->end_date->toDateString()) }}</td>
+                                <td class="tabular-nums" dir="ltr">{{ $p->start() }}–{{ $p->end() }}</td>
+                                <td class="text-slate-500">{{ $p->shift?->name ?? __('All shifts') }}</td>
+                                <td class="text-end"><x-delete-button :action="route('shifts.special.destroy', $p)" :confirm="__('Delete these special hours? The days go back to the shift times.')" class="btn-sm" /></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6"><x-empty icon="fa-moon" :title="__('No special working hours')" /></td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+            <x-slot:footer>
+                <form method="POST" action="{{ route('shifts.special.store') }}" class="grid w-full gap-2 sm:grid-cols-3 lg:grid-cols-7 lg:items-end">
+                    @csrf
+                    <x-input name="name" :label="__('Name')" :value="old('name', __('Ramadan'))" required maxlength="100" id="sp-name" />
+                    <x-input name="start_date" type="date" :label="__('From')" required id="sp-from" />
+                    <x-input name="end_date" type="date" :label="__('To')" required id="sp-to" />
+                    <x-input name="start_time" type="time" :label="__('Start time')" value="09:00" required id="sp-start" />
+                    <x-input name="end_time" type="time" :label="__('End time')" value="14:00" required id="sp-end" />
+                    <x-select name="shift_id" :label="__('Shift')" :options="$shifts->pluck('name', 'id')->all()" :placeholder="__('All shifts')" id="sp-shift" />
+                    <button class="btn btn-secondary"><i class="fa-solid fa-plus"></i>{{ __('Add') }}</button>
+                </form>
+            </x-slot:footer>
+        </x-card>
+    @endif
 </x-layouts.app>

@@ -1,6 +1,34 @@
 <x-layouts.app :title="__('Hello, :name', ['name' => \Illuminate\Support\Str::before($user->name, ' ')])"
                :subtitle="now(display_timezone())->translatedFormat('l, j F Y')">
 
+    @if (isset($myToday) || ! empty($pendingRequests))
+        <div class="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            @isset($myToday)
+                <a href="{{ route('portal.index') }}" class="card flex items-center gap-4 p-4 hover:bg-slate-50">
+                    <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700"><i class="fa-solid fa-user-clock"></i></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm text-slate-500">{{ __('My day today') }}</div>
+                        <div class="mt-0.5 flex flex-wrap items-center gap-2">
+                            <x-attendance-status :status="$myToday['status']" />
+                            @if ($myToday['first_in'])<span class="text-sm tabular-nums text-slate-700" dir="ltr">{{ substr($myToday['first_in'], 11, 5) }}{{ $myToday['last_out'] ? ' – '.substr($myToday['last_out'], 11, 5) : '' }}</span>@endif
+                        </div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right rtl-flip text-slate-300"></i>
+                </a>
+            @endisset
+            @if (! empty($pendingRequests))
+                <a href="{{ route('requests.index') }}" class="card flex items-center gap-4 p-4 hover:bg-slate-50">
+                    <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700"><i class="fa-solid fa-inbox"></i></span>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm text-slate-500">{{ __('Requests') }}</div>
+                        <div class="font-medium text-slate-900">{{ __(':n waiting for review', ['n' => $pendingRequests]) }}</div>
+                    </div>
+                    <i class="fa-solid fa-chevron-right rtl-flip text-slate-300"></i>
+                </a>
+            @endif
+        </div>
+    @endif
+
     @isset($attendanceToday)
         {{-- Today's attendance --}}
         <div class="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">

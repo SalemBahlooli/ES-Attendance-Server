@@ -17,7 +17,7 @@ class Shift extends Model
 
     public const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-    protected $fillable = ['name', 'start_time', 'end_time', 'grace_in', 'grace_out', 'weekend', 'is_default'];
+    protected $fillable = ['name', 'start_time', 'end_time', 'grace_in', 'grace_out', 'weekend', 'is_default', 'flexible', 'required_minutes'];
 
     protected function casts(): array
     {
@@ -26,6 +26,8 @@ class Shift extends Model
             'is_default' => 'boolean',
             'grace_in' => 'integer',
             'grace_out' => 'integer',
+            'flexible' => 'boolean',
+            'required_minutes' => 'integer',
         ];
     }
 
@@ -53,6 +55,26 @@ class Shift extends Model
     public function end(): string
     {
         return substr((string) $this->end_time, 0, 5);
+    }
+
+    /** Flexible hours apply: the shift is marked flexible and the feature is on. */
+    public function isFlexible(): bool
+    {
+        return $this->flexible && feature('flexible');
+    }
+
+    /** Minutes from start to end (a night shift crosses midnight). */
+    public function lengthMinutes(): int
+    {
+        $m = fn (string $t) => (int) substr($t, 0, 2) * 60 + (int) substr($t, 3, 2);
+
+        return (($m($this->end()) - $m($this->start()) + 1440) % 1440) ?: 1440;
+    }
+
+    /** Minutes to work per day on a flexible shift. */
+    public function requiredMinutes(): int
+    {
+        return $this->required_minutes ?: $this->lengthMinutes();
     }
 
     /** @return array<int, int> */

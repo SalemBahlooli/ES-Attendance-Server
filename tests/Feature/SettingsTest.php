@@ -70,6 +70,7 @@ class SettingsTest extends TestCase
 
     public function test_logo_upload(): void
     {
+        config(['settings.groups.branding.hidden' => false]); // hidden in this project for now
         Storage::fake('public');
         $this->signInWith(['settings.manage']);
 

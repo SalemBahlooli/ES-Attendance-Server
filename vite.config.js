@@ -1,6 +1,5 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
-import { bunny } from 'laravel-vite-plugin/fonts';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
@@ -8,11 +7,7 @@ export default defineConfig({
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: true,
-            // Fonts are downloaded at build time and served from /build (no external requests).
-            fonts: [
-                bunny('IBM Plex Sans', { weights: [400, 500, 600, 700] }),
-                bunny('IBM Plex Sans Arabic', { weights: [400, 500, 600, 700] }),
-            ],
+            // The font (Thmanyah Serif Display) is in resources/fonts and declared in resources/css/theme.css.
         }),
         tailwindcss(),
     ],

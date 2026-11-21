@@ -14,9 +14,9 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 
 /**
- * The monthly timesheet in the company's layout. The period runs from the 16th of the
- * previous month to the 15th of the chosen month, two rows per employee: attendance
- * codes (Att.) and overtime hours (OT, filled in by hand).
+ * The monthly timesheet in the company's layout. The period starts on the day set in
+ * Settings → Attendance (16 = the 16th of the previous month to the 15th of the chosen month), two rows per employee: attendance
+ * codes (Att.) and overtime hours (OT: filled in when the Overtime feature is on, else by hand).
  */
 class TimesheetWorkbook
 {
@@ -38,12 +38,29 @@ class TimesheetWorkbook
 
     public function __construct(private Calculator $calculator) {}
 
-    /** "2026-09" → ['from' => '2026-08-16', 'to' => '2026-09-15', 'days' => [...]] */
-    public static function period(string $month): array
+    /** The day of the month a timesheet starts on (Settings → Attendance), 1 to 28. */
+    public static function startDay(): int
+    {
+        return max(1, min(28, (int) setting('timesheet_start_day', 16)));
+    }
+
+    /**
+     * The days of the timesheet named after $month.
+     * Start day 16: "2026-09" → 2026-08-16 to 2026-09-15. Start day 1: 2026-09-01 to 2026-09-30.
+     *
+     * @return array{from: string, to: string, days: array<int, string>}
+     */
+    public static function period(string $month, ?int $startDay = null): array
     {
         [$y, $m] = array_map('intval', explode('-', $month));
-        $start = gmmktime(12, 0, 0, $m - 1, 16, $y);
-        $end = gmmktime(12, 0, 0, $m, 15, $y);
+        $startDay ??= self::startDay();
+        if ($startDay === 1) {
+            $start = gmmktime(12, 0, 0, $m, 1, $y);
+            $end = gmmktime(12, 0, 0, $m + 1, 0, $y);
+        } else {
+            $start = gmmktime(12, 0, 0, $m - 1, $startDay, $y);
+            $end = gmmktime(12, 0, 0, $m, $startDay - 1, $y);
+        }
         $days = [];
         for ($d = $start; $d <= $end; $d += 86400) {
             $days[] = gmdate('Y-m-d', $d);
@@ -61,6 +78,17 @@ class TimesheetWorkbook
             'leave' => self::LEAVE_CODE[$day['leave_type']] ?? 'E',
             default => null, // not in yet
         };
+    }
+
+    /** The timesheet month that contains $date ("2026-11-20" with start day 16 → "2026-12"). */
+    public static function monthOf(string $date): string
+    {
+        $month = substr($date, 0, 7);
+        $startDay = self::startDay();
+
+        return $startDay > 1 && (int) substr($date, 8, 2) >= $startDay
+            ? gmdate('Y-m', strtotime($month.'-01 12:00 UTC +1 month'))
+            : $month;
     }
 
     /** @return array{book: Spreadsheet, period: array} */
@@ -144,6 +172,7 @@ class TimesheetWorkbook
             $ot = $att + 1;
             $present = $leave = $lateMinutes = 0;
             $codes = [];
+            $overtime = [];
             foreach ($p['days'] as $date) {
                 $day = $byPinDate[$emp['pin'].'|'.$date] ?? null;
                 $code = $day ? self::dayCode($day) : null;
@@ -155,6 +184,7 @@ class TimesheetWorkbook
                 }
                 $lateMinutes += $day['late_minutes'] ?? 0;
                 $codes[] = $code;
+                $overtime[] = $day['overtime_minutes'] ?? 0;
             }
 
             $name = $emp['name'] ?: '#'.$emp['pin'];
@@ -175,6 +205,10 @@ class TimesheetWorkbook
             foreach ($codes as $d => $code) {
                 if ($code) {
                     $ws->setCellValue($col(self::FIRST_DAY_COL + $d).$att, $code);
+                }
+                // Overtime hours (the "Overtime" feature); otherwise the row is left to fill by hand
+                if ($overtime[$d] > 0) {
+                    $ws->setCellValue($col(self::FIRST_DAY_COL + $d).$ot, round($overtime[$d] / 60, 2));
                 }
             }
             $ws->mergeCells("A{$att}:A{$ot}");

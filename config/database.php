@@ -84,6 +84,22 @@ return [
             ]) : [],
         ],
 
+        // The old Node.js attendance system (only read): php artisan attendance:import-legacy
+        'legacy' => [
+            'driver' => 'pgsql',
+            'url' => env('LEGACY_DATABASE_URL'),
+            'host' => env('LEGACY_DB_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB_PORT', '5432'),
+            'database' => env('LEGACY_DB_DATABASE', 'railway'),
+            'username' => env('LEGACY_DB_USERNAME', 'postgres'),
+            'password' => env('LEGACY_DB_PASSWORD', ''),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('LEGACY_DB_SSLMODE', 'prefer'),
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

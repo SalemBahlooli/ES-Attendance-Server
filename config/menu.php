@@ -15,6 +15,8 @@
 |   badge       key of a live counter returned by HeartbeatController (optional)
 |   shortcut    true → also an icon in the top bar (optional)
 |   short       a shorter label for the phone's bottom bar (optional)
+|   feature     an optional feature (or a list: any of them) from Settings → Optional features
+|   employee    true → only for accounts linked to an employee (the employee portal)
 |   bottom      true → one of the (up to four) links in the phone's bottom bar
 |   create      ['route' => 'users.create', 'can' => 'users.create', 'label' => 'User']
 |               → an entry in the top bar's blue "Create" menu (optional)
@@ -30,18 +32,24 @@ return [
 
     ['label' => 'Dashboard', 'icon' => 'fa-gauge-high', 'route' => 'dashboard', 'active' => 'dashboard'],
 
+    // The employee portal: only for accounts linked to an employee
+    ['label' => 'My attendance', 'short' => 'Mine', 'icon' => 'fa-user-clock', 'route' => 'portal.index', 'active' => 'portal.*', 'feature' => 'portal', 'employee' => true],
+
     ['heading' => 'Attendance'],
 
     ['label' => 'Overview', 'icon' => 'fa-chart-pie', 'route' => 'overview.index', 'active' => 'overview.*', 'can' => 'reports.view', 'bottom' => true],
     ['label' => 'Daily attendance', 'short' => 'Today', 'icon' => 'fa-calendar-check', 'route' => 'attendance.index', 'active' => 'attendance.*', 'can' => 'attendance.view', 'shortcut' => true, 'bottom' => true],
     ['label' => 'Report', 'icon' => 'fa-chart-column', 'route' => 'reports.index', 'active' => 'reports.*', 'can' => 'reports.view', 'shortcut' => true, 'bottom' => true],
     ['label' => 'Leaves & holidays', 'icon' => 'fa-umbrella-beach', 'route' => 'leaves.index', 'active' => 'leaves.*', 'can' => 'leaves.view'],
+    ['label' => 'Requests', 'icon' => 'fa-inbox', 'route' => 'requests.index', 'active' => 'requests.*', 'can' => 'requests.review',
+        'feature' => ['leave_requests', 'punch_requests'], 'badge' => 'requests'],
 
     ['heading' => 'Management'],
 
     ['label' => 'Employees', 'icon' => 'fa-id-badge', 'route' => 'employees.index', 'active' => 'employees.*', 'can' => 'employees.view', 'shortcut' => true, 'bottom' => true],
     ['label' => 'Punch log', 'icon' => 'fa-list-ul', 'route' => 'punches.index', 'active' => 'punches.*', 'can' => 'punches.view'],
     ['label' => 'Shifts & departments', 'icon' => 'fa-business-time', 'route' => 'shifts.index', 'active' => 'shifts.*', 'can' => 'shifts.manage'],
+    ['label' => 'Shift schedules', 'icon' => 'fa-calendar-week', 'route' => 'schedules.index', 'active' => 'schedules.*', 'can' => 'shifts.manage', 'feature' => 'rosters'],
     ['label' => 'Devices', 'icon' => 'fa-tablet-screen-button', 'route' => 'devices.index', 'active' => 'devices.*', 'can' => 'devices.view'],
     ['label' => 'Import & export', 'icon' => 'fa-file-import', 'route' => 'imports.index', 'active' => 'imports.*', 'can' => 'imports.manage'],
 

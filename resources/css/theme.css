@@ -8,8 +8,45 @@
  | Generated once; edit the values freely.
  */
 
+/* The only font: Thmanyah Serif Display (resources/fonts/thmanyah), served with the app */
+@font-face {
+    font-family: 'Thmanyah Serif Display';
+    src: url('../fonts/thmanyah/thmanyahserifdisplay-Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah Serif Display';
+    src: url('../fonts/thmanyah/thmanyahserifdisplay-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah Serif Display';
+    src: url('../fonts/thmanyah/thmanyahserifdisplay-Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah Serif Display';
+    src: url('../fonts/thmanyah/thmanyahserifdisplay-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: 'Thmanyah Serif Display';
+    src: url('../fonts/thmanyah/thmanyahserifdisplay-Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 @theme {
-    --font-sans: 'IBM Plex Sans', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Thmanyah Serif Display', ui-serif, Georgia, serif;
 
     /* warm neutrals instead of cool slate */
     --color-slate-50: #f6f5f1;

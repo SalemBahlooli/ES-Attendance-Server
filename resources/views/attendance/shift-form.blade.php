@@ -41,6 +41,22 @@
             @endforeach
         </div>
     </div>
+    @if (feature('flexible'))
+        <div class="rounded-lg border border-slate-200 p-3" x-data="{ flex: @js((bool) $old('flexible', $shift->flexible)) }">
+            <label class="flex items-center gap-2 text-sm font-medium text-slate-900">
+                <input type="hidden" name="flexible" value="0">
+                <input type="checkbox" name="flexible" value="1" class="checkbox" x-model="flex">{{ __('Flexible hours') }}
+            </label>
+            <p class="help">{{ __('No late arrival: the employee only has to work the hours. Start and end above mark the day\'s frame.') }}</p>
+            <div x-show="flex" x-cloak class="mt-3 max-w-56">
+                <label class="label" for="shift-req-{{ $id }}">{{ __('Hours to work per day') }}</label>
+                <input id="shift-req-{{ $id }}" type="number" min="0.5" max="24" step="0.25" name="required_hours" class="input"
+                       value="{{ $old('required_hours', $shift->required_minutes ? round($shift->required_minutes / 60, 2) : null) }}"
+                       placeholder="{{ $shift->exists ? round($shift->lengthMinutes() / 60, 2) : 8 }}">
+                <p class="help">{{ __('Empty = from start to end.') }}</p>
+            </div>
+        </div>
+    @endif
     @foreach ($bag->all() as $message)<p class="error">{{ $message }}</p>@endforeach
     <div class="flex justify-end"><button class="btn btn-primary"><i class="fa-solid fa-check"></i>{{ __('Save') }}</button></div>
 </form>

@@ -80,3 +80,16 @@ if (! function_exists('is_rtl')) {
         return (config('settings.locales.'.app()->getLocale().'.dir') ?? 'ltr') === 'rtl';
     }
 }
+
+if (! function_exists('feature')) {
+    /**
+     * Is an optional attendance feature switched on (Settings → Optional features)?
+     * feature('portal'), feature('overtime')... Requests need the portal as well.
+     */
+    function feature(string $name): bool
+    {
+        $on = (bool) setting('feature_'.$name, false);
+
+        return in_array($name, ['leave_requests', 'punch_requests'], true) ? $on && (bool) setting('feature_portal', false) : $on;
+    }
+}

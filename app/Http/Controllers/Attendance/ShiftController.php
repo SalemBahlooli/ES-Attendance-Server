@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\ShiftRequest;
 use App\Models\Department;
 use App\Models\Shift;
+use App\Models\SpecialPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -18,6 +19,7 @@ class ShiftController extends Controller
         return view('attendance.shifts', [
             'shifts' => Shift::withCount(['employees', 'departments'])->orderByDesc('is_default')->orderBy('id')->get(),
             'departments' => Department::with('shift:id,name')->withCount('employees')->orderBy('name')->get(),
+            'specials' => feature('special_hours') ? SpecialPeriod::with('shift:id,name')->orderByDesc('start_date')->limit(50)->get() : collect(),
         ]);
     }
 

@@ -4,8 +4,15 @@
     <x-slot:actions>
         @can('reports.export')
             <button type="button" class="btn btn-secondary" @click="$dispatch('open-modal', 'branch-file')"><i class="fa-solid fa-share-from-square"></i>{{ __('Send to another branch') }}</button>
-            <a href="{{ route('reports.timesheet', ['month' => $timesheetMonth, 'department_id' => $departmentId]) }}" class="btn btn-secondary"
-               title="{{ __('From the 16th of the previous month to the 15th of :month', ['month' => $timesheetMonth]) }}"><i class="fa-solid fa-table-cells"></i>{{ __('Timesheet') }}</a>
+            @php $tsPeriod = \App\Services\Attendance\Exports\TimesheetWorkbook::period($timesheetMonth); @endphp
+            <div class="inline-flex">
+                <a href="{{ route('reports.timesheet', ['month' => $timesheetMonth, 'department_id' => $departmentId]) }}" @class(['btn btn-secondary', 'rounded-e-none' => auth()->user()->hasAccess('settings.manage')])
+                   title="{{ __('Timesheet from :from to :to', ['from' => format_day($tsPeriod['from']), 'to' => format_day($tsPeriod['to'])]) }}"><i class="fa-solid fa-table-cells"></i>{{ __('Timesheet') }}</a>
+                @can('settings.manage')
+                    <a href="{{ route('settings.edit', 'attendance') }}#f_timesheet_start_day" class="btn btn-secondary -ms-px rounded-s-none px-2.5"
+                       title="{{ __('Timesheet period settings') }}" aria-label="{{ __('Timesheet period settings') }}"><i class="fa-solid fa-gear"></i></a>
+                @endcan
+            </div>
             <a href="{{ route('reports.export', ['from' => $from, 'to' => $to, 'department_id' => $departmentId]) }}" class="btn btn-primary"><i class="fa-solid fa-file-excel"></i>{{ __('Export Excel') }}</a>
         @endcan
     </x-slot:actions>
@@ -42,6 +49,7 @@
                         <th>{{ __('Total late') }}</th>
                         <th class="hidden sm:table-cell">{{ __('Early leave') }}</th>
                         <th class="hidden sm:table-cell">{{ __('No check-out') }}</th>
+                        @if (feature('overtime'))<th class="hidden sm:table-cell">{{ __('Overtime') }}</th>@endif
                     </tr>
                 </thead>
                 <tbody>
@@ -58,6 +66,7 @@
                             <td class="tabular-nums {{ $s['late_minutes'] ? 'text-amber-700' : '' }}">{{ Calculator::duration($s['late_minutes']) }}</td>
                             <td class="hidden tabular-nums sm:table-cell">{{ Calculator::duration($s['early_minutes']) }}</td>
                             <td class="hidden tabular-nums sm:table-cell">{{ $s['missing_out'] ?: '' }}</td>
+                            @if (feature('overtime'))<td class="hidden tabular-nums text-teal-700 sm:table-cell">{{ Calculator::duration($s['overtime_minutes']) }}</td>@endif
                         </tr>
                     @empty
                         <tr><td colspan="11"><x-empty icon="fa-chart-column" :title="__('Nothing to show for this period')" /></td></tr>
@@ -83,7 +92,7 @@
                 <div class="overflow-x-auto">
                     <table class="table">
                         <thead>
-                            <tr><th>{{ __('Date') }}</th><th>{{ __('Day') }}</th><th>{{ __('In') }}</th><th>{{ __('Out') }}</th><th>{{ __('Late') }}</th><th>{{ __('Early leave') }}</th><th>{{ __('Status') }}</th><th>{{ __('Note') }}</th></tr>
+                            <tr><th>{{ __('Date') }}</th><th>{{ __('Day') }}</th><th>{{ __('In') }}</th><th>{{ __('Out') }}</th><th>{{ __('Late') }}</th><th>{{ __('Early leave') }}</th>@if (feature('overtime'))<th>{{ __('Overtime') }}</th>@endif<th>{{ __('Status') }}</th><th>{{ __('Note') }}</th></tr>
                         </thead>
                         <tbody>
                             @foreach ($detail as $d)
@@ -94,6 +103,7 @@
                                     <td class="tabular-nums" dir="ltr">{!! $d['missing_out'] ? '<span class="text-red-600">'.e(__('None')).'</span>' : e($d['last_out'] ? substr($d['last_out'], 11, 5) : '') !!}</td>
                                     <td class="tabular-nums">{{ $d['late_minutes'] ? __(':n min', ['n' => $d['late_minutes']]) : '' }}</td>
                                     <td class="tabular-nums">{{ $d['early_minutes'] ? __(':n min', ['n' => $d['early_minutes']]) : '' }}</td>
+                                    @if (feature('overtime'))<td class="tabular-nums text-teal-700">{{ Calculator::duration($d['overtime_minutes']) }}</td>@endif
                                     <td><x-attendance-status :status="$d['status']" /></td>
                                     <td class="text-slate-500">{{ $d['note'] }}</td>
                                 </tr>

@@ -30,7 +30,7 @@ class AttendanceSeeder extends Seeder
 
             Group::firstOrCreate(['name' => 'Supervisors'], [
                 'description' => 'See all attendance, export it, and manage leaves and employees.',
-                'permissions' => $view + ['reports.export' => 1, 'leaves.edit' => 1, 'employees.edit' => 1],
+                'permissions' => $view + ['reports.export' => 1, 'leaves.edit' => 1, 'employees.edit' => 1, 'requests.review' => 1],
             ]);
 
             Group::firstOrCreate(['name' => 'Viewers'], [

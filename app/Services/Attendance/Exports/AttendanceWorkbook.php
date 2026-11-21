@@ -25,27 +25,32 @@ class AttendanceWorkbook
 
         $book = new Spreadsheet;
         $book->getProperties()->setCreator('ES Attendance');
+        // Overtime goes last so the other columns stay where they always were
+        $ot = feature('overtime');
+        $otHead = $ot ? [[__('Overtime'), 12]] : [];
 
         $this->sheet($book->getActiveSheet(), __('Summary'), [
             [__('ID'), 10], [__('Name'), 24], [__('Department'), 16], [__('Shift'), 16], [__('Work days'), 14], [__('Present'), 10],
             [__('Absent'), 10], [__('Leave'), 10], [__('Times late'), 14], [__('Total late'), 14], [__('Times left early'), 18],
-            [__('Total early leave'), 18], [__('No check-out'), 16], [__('Worked days off'), 16], [__('Worked hours'), 14],
+            [__('Total early leave'), 18], [__('No check-out'), 16], [__('Worked days off'), 16], [__('Worked hours'), 14], ...$otHead,
         ], array_map(fn ($s) => [
             $s['pin'], $s['name'], $s['department'], $s['shift'], $s['work_days'], $s['present'], $s['absent'], $s['leave'],
             $s['late_count'], Calculator::duration($s['late_minutes']), $s['early_count'], Calculator::duration($s['early_minutes']),
             $s['missing_out'], $s['offday_work'], Calculator::duration($s['worked_minutes']),
+            ...($ot ? [Calculator::duration($s['overtime_minutes'])] : []),
         ], $summary));
 
         $daily = $this->sheet($book->createSheet(), __('Daily'), [
             [__('Date'), 12], [__('Day'), 11], [__('ID'), 10], [__('Name'), 24], [__('Department'), 16], [__('Shift'), 16],
             [__('In'), 10], [__('Out'), 10], [__('Worked'), 14], [__('Late (min)'), 15], [__('Early leave (min)'), 19],
-            [__('Status'), 16], [__('Note'), 24],
+            [__('Status'), 16], [__('Note'), 24], ...$otHead,
         ], array_map(fn ($d) => [
             $d['date'], __($d['day_name']), $d['pin'], $d['name'], $d['department'], $d['shift'],
             $d['first_in'] ? substr($d['first_in'], 11, 5) : '',
             $d['missing_out'] ? __('None') : ($d['last_out'] ? substr($d['last_out'], 11, 5) : ''),
             Calculator::duration($d['worked_minutes']), $d['late_minutes'] ?: '', $d['early_minutes'] ?: '',
             Calculator::statusLabel($d['status']), $d['note'],
+            ...($ot ? [Calculator::duration($d['overtime_minutes'])] : []),
         ], $days));
         foreach ($days as $i => $d) {
             if ($color = self::STATUS_FILL[$d['status']] ?? null) {

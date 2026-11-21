@@ -12,6 +12,7 @@ use App\Models\Leave;
 use App\Models\Punch;
 use App\Models\Shift;
 use App\Services\Attendance\Exports\TimesheetWorkbook;
+use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -154,6 +155,15 @@ class ManageAttendanceTest extends TestCase
 
     public function test_the_timesheet_period_runs_from_the_16th_to_the_15th(): void
     {
+        // Start day from Settings → Attendance
+        app(Settings::class)->set(['timesheet_start_day' => 1]);
+        $this->assertSame(['2026-02-01', '2026-02-28'], array_values(array_slice(TimesheetWorkbook::period('2026-02'), 0, 2)));
+        $this->assertSame('2026-11', TimesheetWorkbook::monthOf('2026-11-20'));
+        app(Settings::class)->set(['timesheet_start_day' => 26]);
+        $this->assertSame(['2026-10-26', '2026-11-25'], array_values(array_slice(TimesheetWorkbook::period('2026-11'), 0, 2)));
+        $this->assertSame('2026-12', TimesheetWorkbook::monthOf('2026-11-26'));
+        app(Settings::class)->set(['timesheet_start_day' => 16]);
+
         $p = TimesheetWorkbook::period('2026-03');
         $this->assertSame('2026-02-16', $p['from']);
         $this->assertSame('2026-03-15', $p['to']);

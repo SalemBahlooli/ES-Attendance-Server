@@ -74,6 +74,8 @@ return [
         'branding' => [
             'label' => 'Branding',
             'icon' => 'fa-palette',
+            // Hidden for now: the defaults (ES Attendance look) apply. Remove this line to bring the page back.
+            'hidden' => true,
             'description' => 'Logo, colors and the sign-in page',
             'fields' => [
                 'logo' => [
@@ -118,10 +120,70 @@ return [
                     'rules' => ['nullable', 'string', 'max:100'],
                     'help' => 'Written in the files you send to another branch.',
                 ],
+                'timesheet_start_day' => [
+                    'type' => 'number', 'label' => 'Timesheet starts on day', 'default' => 16,
+                    'rules' => ['required', 'integer', 'min:1', 'max:28'],
+                    'help' => '1 = from the 1st to the last day of the month. 16 = from the 16th of the previous month to the 15th of the month.',
+                ],
                 'allowed_devices' => [
                     'type' => 'textarea', 'label' => 'Allowed device serial numbers', 'default' => '',
                     'rules' => ['nullable', 'string', 'max:2000'],
                     'help' => 'One per line or comma separated. Empty = any device may send punches.',
+                ],
+            ],
+        ],
+
+        // Read with feature('portal'), feature('overtime')...
+        'features' => [
+            'label' => 'Optional features',
+            'icon' => 'fa-toggle-on',
+            'description' => 'Turn attendance features on or off',
+            'fields' => [
+                'feature_portal' => [
+                    'type' => 'toggle', 'label' => 'Employee portal', 'default' => false,
+                    'help' => 'Employees sign in and see only their own attendance. Link each employee to an account on the employee\'s page.',
+                ],
+                'feature_leave_requests' => [
+                    'type' => 'toggle', 'label' => 'Leave requests', 'default' => false,
+                    'help' => 'Employees ask for a leave from the portal; once approved, it is added to their leaves. Needs the employee portal.',
+                ],
+                'feature_punch_requests' => [
+                    'type' => 'toggle', 'label' => 'Punch correction requests', 'default' => false,
+                    'help' => 'Employees ask to add a punch they forgot; once approved, it is added as a manual punch. Needs the employee portal.',
+                ],
+                'feature_overtime' => [
+                    'type' => 'toggle', 'label' => 'Overtime', 'default' => false,
+                    'help' => 'Counts the minutes worked after the shift end, and all the hours of a worked day off. Fills the OT row of the timesheet.',
+                ],
+                'overtime_min_minutes' => [
+                    'type' => 'number', 'label' => 'Count overtime from (minutes)', 'default' => 30,
+                    'rules' => ['required', 'integer', 'min:0', 'max:600'],
+                    'help' => 'Less than this after the shift end is not overtime.',
+                ],
+                'feature_flexible' => [
+                    'type' => 'toggle', 'label' => 'Flexible hours', 'default' => true,
+                    'help' => 'A shift marked flexible has no late arrival: the employee only has to work its hours each day.',
+                ],
+                'feature_rosters' => [
+                    'type' => 'toggle', 'label' => 'Shift schedules', 'default' => false,
+                    'help' => 'Give an employee another shift for some days, or rotate between two shifts every few weeks.',
+                ],
+                'feature_special_hours' => [
+                    'type' => 'toggle', 'label' => 'Special working hours (Ramadan)', 'default' => false,
+                    'help' => 'Other start and end times between two dates, without changing the shifts.',
+                ],
+                'feature_leave_balances' => [
+                    'type' => 'toggle', 'label' => 'Leave balances', 'default' => false,
+                    'help' => 'Each employee has a number of annual leave days per year; annual leaves are taken from it.',
+                ],
+                'annual_leave_days' => [
+                    'type' => 'number', 'label' => 'Annual leave days per year', 'default' => 30,
+                    'rules' => ['required', 'integer', 'min:0', 'max:365'],
+                    'help' => 'For everyone, unless set on the employee\'s page. Weekends and public holidays are not counted.',
+                ],
+                'feature_employee_sheet' => [
+                    'type' => 'toggle', 'label' => 'Printable employee sheet', 'default' => false,
+                    'help' => 'A one-page attendance sheet for an employee, ready to print or save as PDF, with lines to sign.',
                 ],
             ],
         ],

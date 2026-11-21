@@ -29,6 +29,8 @@ class ShiftRequest extends FormRequest
             'grace_out' => ['required', 'integer', 'min:0', 'max:600'],
             'weekend' => ['nullable', 'array'],
             'weekend.*' => ['integer', 'between:0,6'],
+            'flexible' => ['nullable', 'boolean'],
+            'required_hours' => ['nullable', 'numeric', 'min:0.5', 'max:24'],
         ];
     }
 
@@ -37,6 +39,7 @@ class ShiftRequest extends FormRequest
         return [
             'name' => __('Name'), 'start_time' => __('Start'), 'end_time' => __('End'),
             'grace_in' => __('Late grace (min)'), 'grace_out' => __('Early leave grace (min)'), 'weekend' => __('Weekend'),
+            'required_hours' => __('Hours to work per day'),
         ];
     }
 
@@ -45,6 +48,14 @@ class ShiftRequest extends FormRequest
     {
         $data = $this->validated();
         $data['weekend'] = collect($data['weekend'] ?? [])->map(fn ($d) => (int) $d)->unique()->sort()->values()->all();
+        // Flexible hours: only touched while the feature is on
+        unset($data['required_hours']);
+        if (feature('flexible')) {
+            $data['flexible'] = $this->boolean('flexible');
+            $data['required_minutes'] = $this->filled('required_hours') ? (int) round((float) $this->input('required_hours') * 60) : null;
+        } else {
+            unset($data['flexible']);
+        }
 
         return $data;
     }

@@ -24,7 +24,6 @@
         <link rel="icon" href="{{ Storage::disk('public')->url(setting('favicon')) }}">
     @endif
     <script>try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
-    @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="auth-page min-h-screen overflow-x-hidden text-slate-900">

@@ -10,6 +10,24 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// The employee portal: the signed-in employee's own attendance and requests.
+// No permission: an account sees only the employee linked to it.
+Route::middleware('feature:portal')->prefix('my')->name('portal.')->group(function () {
+    Route::get('attendance', [Attendance\PortalController::class, 'index'])->name('index');
+    Route::get('sheet', [Attendance\PortalController::class, 'sheet'])->middleware('feature:employee_sheet')->name('sheet');
+    Route::middleware('feature:leave_requests,punch_requests')->group(function () {
+        Route::post('requests', [Attendance\PortalController::class, 'storeRequest'])->name('requests.store');
+        Route::delete('requests/{employeeRequest}', [Attendance\PortalController::class, 'cancelRequest'])->name('requests.cancel');
+    });
+});
+
+// Reviewing those requests
+Route::middleware(['feature:leave_requests,punch_requests', 'can:requests.review'])->group(function () {
+    Route::get('requests', [Attendance\RequestController::class, 'index'])->name('requests.index');
+    Route::post('requests/{employeeRequest}/approve', [Attendance\RequestController::class, 'approve'])->name('requests.approve');
+    Route::post('requests/{employeeRequest}/reject', [Attendance\RequestController::class, 'reject'])->name('requests.reject');
+});
+
 // Daily attendance
 Route::get('attendance', [Attendance\DailyController::class, 'index'])->middleware('can:attendance.view')->name('attendance.index');
 
@@ -45,6 +63,7 @@ Route::middleware('can:employees.view')->group(function () {
     Route::get('employees', [Attendance\EmployeeController::class, 'index'])->name('employees.index');
     Route::get('employees/{employee}', [Attendance\EmployeeController::class, 'show'])->name('employees.show');
     Route::get('employees/{employee}/export', [Attendance\EmployeeController::class, 'export'])->name('employees.export');
+    Route::get('employees/{employee}/sheet', [Attendance\EmployeeSheetController::class, 'show'])->middleware('feature:employee_sheet')->name('employees.sheet');
     Route::put('employees/{employee}', [Attendance\EmployeeController::class, 'update'])->middleware('can:employees.edit')->name('employees.update');
 });
 
@@ -70,6 +89,19 @@ Route::middleware('can:shifts.manage')->group(function () {
     Route::post('departments', [Attendance\DepartmentController::class, 'store'])->name('shifts.departments.store');
     Route::put('departments/{department}', [Attendance\DepartmentController::class, 'update'])->name('shifts.departments.update');
     Route::delete('departments/{department}', [Attendance\DepartmentController::class, 'destroy'])->name('shifts.departments.destroy');
+
+    // Special working hours (Ramadan), on the shifts page
+    Route::middleware('feature:special_hours')->group(function () {
+        Route::post('special-hours', [Attendance\SpecialPeriodController::class, 'store'])->name('shifts.special.store');
+        Route::delete('special-hours/{specialPeriod}', [Attendance\SpecialPeriodController::class, 'destroy'])->name('shifts.special.destroy');
+    });
+
+    // Shift schedules (rotations)
+    Route::middleware('feature:rosters')->group(function () {
+        Route::get('schedules', [Attendance\ShiftAssignmentController::class, 'index'])->name('schedules.index');
+        Route::post('schedules', [Attendance\ShiftAssignmentController::class, 'store'])->name('schedules.store');
+        Route::delete('schedules/{assignment}', [Attendance\ShiftAssignmentController::class, 'destroy'])->name('schedules.destroy');
+    });
 });
 
 // Devices

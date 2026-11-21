@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Announcement;
+use App\Models\EmployeeRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,6 +57,9 @@ class HeartbeatController extends Controller
     private function counters(User $user): array
     {
         $out = [];
+        if ($user->hasAccess('requests.review') && EmployeeRequest::enabledKinds()) {
+            $out['requests'] = EmployeeRequest::enabled()->where('status', 'pending')->count();
+        }
 
         return $out;
     }

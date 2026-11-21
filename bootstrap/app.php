@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsureFeature;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\RecordUnloggedActions;
 use App\Http\Middleware\SecurityHeaders;
@@ -40,6 +41,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->append(SecurityHeaders::class);
+
+        // feature:portal → 404 while that optional feature is off (Settings → Optional features)
+        $middleware->alias(['feature' => EnsureFeature::class]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));

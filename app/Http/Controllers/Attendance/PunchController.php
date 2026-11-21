@@ -72,7 +72,7 @@ class PunchController extends Controller
         $time = $data['time'].':00';
         $this->ensureFree($data['pin'], $time);
         Employee::ensure([$data['pin']]);
-        $punch = $this->addManual($request, $data['pin'], $time, $data['note'] ?? null);
+        $punch = Punch::addManual($data['pin'], $time, $data['note'] ?? null, $request->user()->id);
 
         Activity::log('punch_added', $punch, $this->describe('Added punch', $punch, $data['note'] ?? null));
 
@@ -94,7 +94,7 @@ class PunchController extends Controller
 
         $punch->forceFill(['deleted_by' => $request->user()->id])->save();
         $punch->delete();
-        $new = $this->addManual($request, $punch->pin, $time, $data['note'] ?? null, $punch->id);
+        $new = Punch::addManual($punch->pin, $time, $data['note'] ?? null, $request->user()->id, $punch->id);
 
         Activity::log('punch_edited', $new, $this->describe('Edited punch', $new, $data['note'] ?? null, $old), ['old' => $old, 'new' => $time]);
 
@@ -118,20 +118,6 @@ class PunchController extends Controller
         if ($taken) {
             throw ValidationException::withMessages(['time' => __('There is already a punch at this time.')]);
         }
-    }
-
-    /** A manual punch; brings back a deleted row at the same time instead of duplicating it. */
-    private function addManual(Request $request, string $pin, string $time, ?string $note, ?int $replacesId = null): Punch
-    {
-        $punch = Punch::withTrashed()->where('pin', $pin)->where('punch_time', $time)->first() ?? new Punch(['pin' => $pin, 'punch_time' => $time]);
-        $punch->fill([
-            'sn' => 'MANUAL', 'source' => 'manual', 'created_by' => $request->user()->id,
-            'note' => $note, 'replaces_id' => $replacesId, 'deleted_by' => null,
-        ]);
-        $punch->deleted_at = null;
-        $punch->save();
-
-        return $punch;
     }
 
     private function describe(string $what, Punch $punch, ?string $note, ?string $old = null): string

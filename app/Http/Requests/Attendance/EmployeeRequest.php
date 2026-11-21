@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Attendance;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class EmployeeRequest extends FormRequest
 {
@@ -19,6 +20,8 @@ class EmployeeRequest extends FormRequest
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'start_date' => ['nullable', 'date_format:Y-m-d'],
             'is_active' => ['required', 'boolean'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id', Rule::unique('employees', 'user_id')->ignore($this->route('employee'))],
+            'annual_leave_days' => ['nullable', 'integer', 'min:0', 'max:365'],
         ];
     }
 
@@ -27,6 +30,7 @@ class EmployeeRequest extends FormRequest
         return [
             'name' => __('Name'), 'department_id' => __('Department'), 'shift_id' => __('Shift'),
             'start_date' => __('Start date'), 'is_active' => __('Active'),
+            'user_id' => __('Sign-in account'), 'annual_leave_days' => __('Annual leave days'),
         ];
     }
 }

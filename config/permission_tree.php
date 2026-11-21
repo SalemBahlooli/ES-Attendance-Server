@@ -281,6 +281,17 @@ return [
                 ],
             ],
 
+            'Employee requests' => [
+                'icon' => 'fa-inbox',
+                'description' => 'Leave and punch correction requests from the employee portal',
+                'permissions' => [
+                    'requests.review' => [
+                        'label' => 'Approve and reject employee requests',
+                        'note' => 'An approved leave is added to the employee\'s leaves; an approved punch is added as a manual punch. Nobody can approve their own request.',
+                    ],
+                ],
+            ],
+
             'Employees' => [
                 'icon' => 'fa-id-badge',
                 'description' => 'The people who punch on the devices',
@@ -300,7 +311,7 @@ return [
                 'permissions' => [
                     'shifts.manage' => [
                         'label' => 'Manage shifts and departments',
-                        'note' => 'Changes how lateness and absence are counted for everyone.',
+                        'note' => 'Also shift schedules and special working hours (Ramadan). Changes how lateness and absence are counted for everyone.',
                     ],
                     'devices.view' => [
                         'label' => 'View devices',
