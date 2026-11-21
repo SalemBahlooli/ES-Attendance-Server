@@ -27,6 +27,14 @@ if [ -z "${APP_KEY}" ] && ! grep -qE '^APP_KEY=.+' .env 2>/dev/null; then
     php artisan key:generate --force
 fi
 
+# A key Laravel cannot use breaks every page ("Unsupported cipher or incorrect key length"):
+# say so now, in plain words.
+if [ -n "${APP_KEY}" ] && ! php -r 'exit(preg_match("/^base64:/", getenv("APP_KEY")) && strlen(base64_decode(substr(getenv("APP_KEY"), 7), true) ?: "") === 32 ? 0 : 1);'; then
+    echo "[entrypoint] APP_KEY is not a valid key. It must look like base64:... (44 characters after base64:)." >&2
+    echo "[entrypoint] Create one with: php artisan key:generate --show" >&2
+    exit 1
+fi
+
 mkdir -p storage/app/public storage/app/private storage/app/backups storage/framework/cache \
          storage/framework/sessions storage/framework/views storage/logs
 chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
