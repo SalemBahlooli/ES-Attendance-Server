@@ -37,7 +37,7 @@ docker compose exec app php artisan db:seed --class=AttendanceDemoSeeder
 
 ## التشغيل على Railway
 
-ملف `railway.json` جاهز. أضف قاعدة بيانات MySQL أو PostgreSQL، ثم المتغيرات: `APP_KEY` (من `php artisan key:generate --show`)، و`APP_URL`، و`DB_*`، و`ADMIN_EMAIL` و`ADMIN_PASSWORD` لأول حساب. التفاصيل في [docs/deployment.md](docs/deployment.md).
+ملف `railway.json` جاهز. أضف قاعدة بيانات **جديدة** (MySQL أو PostgreSQL) خاصة بهذي النسخة، لا تربطها بقاعدة النسخة القديمة (Node.js): تلك تحطها في `LEGACY_DATABASE_URL` وتنقل بياناتها بأمر `attendance:import-legacy`. اربط الخدمة بالقاعدة الجديدة بـ `DB_URL` (أو `DATABASE_URL` يُقرأ تلقائياً)، ثم المتغيرات: `APP_KEY` (من `php artisan key:generate --show`)، و`APP_URL`، و`DB_*`، و`ADMIN_EMAIL` و`ADMIN_PASSWORD` لأول حساب. التفاصيل في [docs/deployment.md](docs/deployment.md).
 
 لربط الجهاز بسيرفر Railway فعّل **TCP Proxy** على منفذ التطبيق، واكتب عنوانه في الجهاز.
 

@@ -31,11 +31,44 @@ mkdir -p storage/app/public storage/app/private storage/app/backups storage/fram
          storage/framework/sessions storage/framework/views storage/logs
 chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
 
-# Wait up to 60 seconds for the database.
+# Railway's database services give DATABASE_URL (or MYSQL_URL): use it when DB_URL is not set.
+if [ -z "${DB_URL}" ]; then
+    for candidate in "${DATABASE_URL}" "${MYSQL_URL}"; do
+        if [ -n "${candidate}" ]; then
+            export DB_URL="${candidate}"
+            break
+        fi
+    done
+fi
+if [ -n "${DB_URL}" ] && [ -z "${DB_CONNECTION}" ]; then
+    case "${DB_URL}" in
+        postgres*) export DB_CONNECTION=pgsql ;;
+        mysql*|mariadb*) export DB_CONNECTION=mysql ;;
+    esac
+fi
+echo "[entrypoint] database: ${DB_CONNECTION:-sqlite}${DB_URL:+ (from a URL)}${DB_HOST:+ at ${DB_HOST}}"
+
+# Wait up to 60 seconds for the database; say why when it never answers.
 i=0
-until php artisan db:show >/dev/null 2>&1 || [ $i -ge 30 ]; do
-    i=$((i+1)); echo "[entrypoint] waiting for the database ($i/30)..."; sleep 2
+until php artisan db:show >/dev/null 2>&1; do
+    i=$((i+1))
+    if [ $i -ge 30 ]; then
+        echo "[entrypoint] the database did not answer. The error:" >&2
+        php artisan db:show 2>&1 | tail -n 5 >&2 || true
+        echo "[entrypoint] check DB_CONNECTION and DB_URL (or DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD)." >&2
+        exit 1
+    fi
+    echo "[entrypoint] waiting for the database ($i/30)..."; sleep 2
 done
+
+# The old Node.js attendance database is not this app's database: migrating into it would
+# clash with its tables. Give this app a new, empty database and copy the old data with
+# php artisan attendance:import-legacy (LEGACY_DATABASE_URL).
+if php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $s = Illuminate\Support\Facades\Schema::getFacadeRoot(); exit($s->hasTable("attendance") && ! $s->hasTable("migrations") ? 0 : 1);' 2>/dev/null; then
+    echo "[entrypoint] this database belongs to the old attendance system (it has an \"attendance\" table)." >&2
+    echo "[entrypoint] add a new database for this app, and set the old one as LEGACY_DATABASE_URL to import it." >&2
+    exit 1
+fi
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     php artisan migrate --force
