@@ -99,13 +99,42 @@ class Employee extends Model
         return static::where('pin', $pin)->first()?->label() ?? __('Employee :pin', ['pin' => $pin]);
     }
 
-    /** Make sure an employee row exists for each of these numbers. */
+    /**
+     * Make sure an employee row exists for each of these numbers. For numbers that really
+     * punched (or got a punch by hand): a number deleted earlier is back, so it is no
+     * longer remembered as deleted.
+     */
     public static function ensure(array $pins): void
     {
-        $pins = array_values(array_unique(array_filter(array_map('strval', $pins), fn ($p) => $p !== '')));
+        $pins = self::cleanPins($pins);
         $now = now();
         foreach (array_chunk($pins, 500) as $chunk) {
             static::insertOrIgnore(array_map(fn ($pin) => ['pin' => $pin, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now], $chunk));
+            RemovedEmployee::whereIn('pin', $chunk)->delete();
         }
+    }
+
+    /**
+     * Same, for numbers from the device's list of enrolled people (no punch behind them):
+     * numbers someone deleted stay deleted.
+     */
+    public static function ensureListed(array $pins): void
+    {
+        $pins = self::cleanPins($pins);
+        $removed = [];
+        foreach (array_chunk($pins, 500) as $chunk) {
+            $removed += array_flip(RemovedEmployee::whereIn('pin', $chunk)->pluck('pin')->all());
+        }
+        $now = now();
+        $keep = array_values(array_filter($pins, fn ($p) => ! isset($removed[$p])));
+        foreach (array_chunk($keep, 500) as $chunk) {
+            static::insertOrIgnore(array_map(fn ($pin) => ['pin' => $pin, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now], $chunk));
+        }
+    }
+
+    /** @return array<int, string> */
+    private static function cleanPins(array $pins): array
+    {
+        return array_values(array_unique(array_filter(array_map('strval', $pins), fn ($p) => $p !== '')));
     }
 }

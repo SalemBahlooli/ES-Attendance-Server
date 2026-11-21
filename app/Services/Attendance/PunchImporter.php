@@ -335,7 +335,7 @@ class PunchImporter
                 continue;
             }
             if ($create) {
-                Employee::ensure([$pin]);
+                Employee::ensureListed([$pin]); // an employee someone deleted is not brought back
             }
             $count += Employee::where('pin', $pin)->where(fn ($q) => $q->whereNull('name')->orWhere('name', ''))
                 ->update(['name' => mb_substr($name, 0, 255), 'updated_at' => now()]);

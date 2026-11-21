@@ -53,6 +53,32 @@ class DeleteEmployeesTest extends TestCase
         $this->assertTrue(Employee::where('pin', '1')->exists());
     }
 
+    public function test_the_device_list_of_enrolled_people_does_not_bring_a_deleted_employee_back(): void
+    {
+        $user = $this->signInWith(['employees.view', 'employees.edit', 'employees.delete', 'imports.manage']);
+        $token = $user->createToken('bridge')->plainTextToken;
+        Employee::create(['pin' => '1', 'name' => 'Left the company']);
+        Employee::create(['pin' => '2']);
+        $this->delete(route('employees.destroy-many'), ['ids' => Employee::pluck('id')->all()]);
+        $this->assertDatabaseHas('removed_employees', ['pin' => '1', 'name' => 'Left the company', 'removed_by' => $user->id]);
+
+        // ADMS user records, and the LAN bridge's user list (like a LAN pull)
+        $this->call('POST', '/iclock/cdata?SN=ABC123&table=USERINFO', [], [], [], ['CONTENT_TYPE' => 'text/plain'], "PIN=1\tName=Still enrolled\nPIN=5\tName=New person\n")->assertOk();
+        auth()->forgetGuards();
+        $this->withToken($token)->postJson('/api/v1/punches/import', ['records' => [], 'users' => [['pin' => '2', 'name' => 'Also enrolled']]])->assertOk();
+
+        $this->assertSame(['5'], Employee::pluck('pin')->all(), 'Only someone never deleted is added');
+
+        // A new punch is real: the employee is back, with the device name, and no longer remembered as deleted
+        $this->withToken($token)->postJson('/api/v1/punches/import', [
+            'records' => [['pin' => '1', 'time' => '2026-11-18 08:00:00']], 'users' => [['pin' => '1', 'name' => 'Still enrolled']],
+        ])->assertOk();
+
+        $this->assertSame('Still enrolled', Employee::where('pin', '1')->value('name'));
+        $this->assertDatabaseMissing('removed_employees', ['pin' => '1']);
+        $this->assertDatabaseHas('removed_employees', ['pin' => '2']);
+    }
+
     public function test_deleting_needs_its_own_permission(): void
     {
         $this->signInWith(['employees.view', 'employees.edit']);

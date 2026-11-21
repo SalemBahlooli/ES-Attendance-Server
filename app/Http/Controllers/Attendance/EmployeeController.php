@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\EmployeeRequest;
 use App\Models\Employee;
 use App\Models\Punch;
+use App\Models\RemovedEmployee;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Attendance\Calculator;
@@ -138,6 +139,8 @@ class EmployeeController extends Controller
                 $punches += Punch::whereIn('pin', $pins->all())->update(['deleted_at' => now(), 'deleted_by' => $userId]);
             }
             $employees->each->delete(); // each one is in the activity log
+            // so the device's list of enrolled people does not bring them back
+            RemovedEmployee::remember($employees, $userId);
 
             return $punches;
         });

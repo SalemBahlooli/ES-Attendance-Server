@@ -96,8 +96,8 @@ class IclockController extends Controller
             }
             if ($users) {
                 $names = PunchImporter::saveUsers($users);
-                // An employee row for every number, even without a name
-                Employee::ensure(array_column($users, 'pin'));
+                // An employee row for every number, even without a name (not for deleted ones)
+                Employee::ensureListed(array_column($users, 'pin'));
                 Log::info("[ADMS] {$sn}: received ".count($users)." user records, {$names} names added");
             }
 
