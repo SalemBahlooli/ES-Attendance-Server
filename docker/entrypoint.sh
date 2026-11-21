@@ -92,4 +92,10 @@ if [ "${RUN_QUEUE:-true}" = "true" ]; then
     su -s /bin/sh www-data -c "php artisan queue:work --sleep=3 --tries=3 --max-time=3600" &
 fi
 
+# mod_php needs the prefork MPM, and Apache refuses to start with more than one MPM
+# (some base images or hosts enable mpm_event as well).
+if [ "$1" = "apache2-foreground" ]; then
+    rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.*
+fi
+
 exec "$@"

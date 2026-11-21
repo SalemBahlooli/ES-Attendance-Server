@@ -29,6 +29,7 @@ ENV APACHE_DOCUMENT_ROOT=/var/www/html/public \
 RUN sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf \
     && sed -ri 's!Listen 80!Listen ${PORT}!' /etc/apache2/ports.conf \
     && sed -ri 's!<VirtualHost \*:80>!<VirtualHost *:${PORT}>!' /etc/apache2/sites-available/000-default.conf \
+    && (a2dismod -f mpm_event mpm_worker >/dev/null 2>&1 || true) && a2enmod mpm_prefork \
     && a2enmod rewrite headers \
     && printf 'ServerName localhost\nServerTokens Prod\nServerSignature Off\n' > /etc/apache2/conf-enabled/zz-security.conf
 
