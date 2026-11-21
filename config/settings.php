@@ -34,7 +34,7 @@ return [
             'description' => 'Name, language, time zone and date formats',
             'fields' => [
                 'app_name' => [
-                    'type' => 'text', 'label' => 'System name', 'default' => env('APP_NAME', 'Laravel Template'),
+                    'type' => 'text', 'label' => 'System name', 'default' => env('APP_NAME', 'ES Attendance'),
                     'rules' => ['required', 'string', 'max:80'],
                     'help' => 'Shown in the browser tab, the sidebar and every email.',
                 ],
